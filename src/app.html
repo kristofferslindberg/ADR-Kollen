@@ -299,7 +299,7 @@ function parseLines(lines) {
     const subs = [];
     for (const pm of head.matchAll(/\(\s*([1-9](?:\.[1-9])?(?:\s*[,+]\s*[1-9](?:\.[1-9])?)*)\s*\)/g)) subs.push(...pm[1].split(/\s*[,+]\s*/));
     const tunM = head.match(/\(\s*([A-E](?:\d{4})?[A-E]?(?:\/[A-E])?|-)\s*\)/);
-    rows.push({ idType, un, name, subs, tunnel: tunM ? tunM[1] : "", cls: clsM ? clsM[1] : "", pg: pgM ? "I".repeat(pgM[1].length) : "",
+    rows.push({ idType, un, name, desc: head, subs, tunnel: tunM ? tunM[1] : "", cls: clsM ? clsM[1] : "", pg: pgM ? "I".repeat(pgM[1].length) : "",
                 qty: q ? q.qty : null, unit: q ? q.unit : "L", gross: q ? q.gross : false, warn });
   }
   // UN-nummer som bara nämns i löptext (t.ex. "kollin med UN 3107 ska skyddas...") och redan finns
@@ -332,6 +332,11 @@ function pickVariant(cand, r) {
       else if (r.pg === "I") { const m = Math.min(...rows.map(catNum)); rows = rows.filter((c) => catNum(c) === m); }
       else if (r.pg === "II" && rows.length === 3) rows = [rows[1]];
     }
+  }
+  if (distinctCats(rows) > 1 && rows.some((c) => /benamning/.test(c[8] || ""))) {
+    // T.ex. UN 2215 MALEINSYRAANHYDRID: smält form är kategori 0.
+    const molten = /molten|smält|smalt/i.test((r.desc || "") + " " + (r.name || ""));
+    narrow((c) => /MOLTEN/.test(c[4]) === molten);
   }
   if (distinctCats(rows) > 1 && r.tunnel) narrow((c) => c[6] === r.tunnel);
   const row = rows.reduce((a, b) => (catNum(b) < catNum(a) ? b : a));
@@ -553,7 +558,7 @@ $("sheet").addEventListener("submit", (e) => {
   const same = old && old.un === un;
   const lab = !$("fLabelsField").hidden && editLabels ? labelSet(editLabels) : null;
   const row = { idType: "UN", un, name, cls: lab ? lab[0] : same ? old.cls : "", subs: lab ? lab.slice(1) : same ? old.subs || [] : [],
-                tunnel: same ? old.tunnel || "" : "", pg: editPg, qty, unit: editUnit, gross: false, warn: [] };
+                tunnel: same ? old.tunnel || "" : "", desc: same ? old.desc || "" : "", pg: editPg, qty, unit: editUnit, gross: false, warn: [] };
   if (old) state.rows[editIdx] = row; else state.rows.push(row);
   if (state.example) { state.example = false; state.source = "Egen inmatning"; if (!old) state.rows = [row]; }
   closeSheet(); render();

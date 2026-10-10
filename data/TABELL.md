@@ -22,7 +22,8 @@ Filer: `adr_tabell_a.csv` (semikolonseparerad, UTF-8, öppnas direkt i Excel) oc
 | multiplier | 1.1.3.6.4: kat 1 = 50, kat 2 = 3, kat 3 = 1, kat 4 = 0, kat 0 = tom (inget undantag) |
 | status | RAKNAS, KATEGORI_0_INGET_UNDANTAG, TRANSPORT_FORBJUDEN, OMFATTAS_EJ_AV_ADR, INGEN_TRANSPORTKATEGORI |
 | needs_packing_group | `ja` om raderna för UN-numret har olika kategorier, då måste förpackningsgruppen läsas av på fraktsedeln |
-| pg_hint | Förpackningsgrupp (I/II/III) som raden motsvarar. Härledd ur transportkategorin (PG I = kat 1, II = 2, III = 3), finns bara där den behövs |
+| pg_hint | Förpackningsgrupp (I/II/III) som raden motsvarar, bara där den behövs. Härledd ur klass, transportkategori och LQ. Obs: klass 6.1 förpackningsgrupp III har kategori 2, inte 3 |
+| select_by | Hur rätt rad väljs när UN-numret har flera kategorier: `forpackningsgrupp`, `etiketter` (aerosoler UN 1950 och gaspatroner UN 2037, t.ex. 2.1 = brandfarlig = kat 2) eller `forpackningsgrupp+benamning` (UN 2215, SMÄLT = kat 0) |
 | tunnel_code | Tunnelrestriktionskod |
 | labels | Etiketter |
 | limited_quantity | Begränsad mängd (LQ) per innerförpackning |
@@ -32,6 +33,9 @@ Filer: `adr_tabell_a.csv` (semikolonseparerad, UTF-8, öppnas direkt i Excel) oc
 Summa = mängd kat 1 × 50 + mängd kat 2 × 3 + mängd kat 3 × 1 (kat 4 räknas 0).
 Över 1 000 eller någon rad med kategori 0 eller TRANSPORT_FORBJUDEN betyder att undantaget inte gäller.
 Mängd är nettomassa (kg) för fasta ämnen, liter för vätskor, nominell volym för gasbehållare och bruttomassa för föremål.
+
+## Ändringslogg
+- 2026-10-10: Kontroll av alla rader mot källan och mot reglerna i 1.1.3.6.3: inga fel i transportkategori eller multiplikator. Rättat `pg_hint` för 86 rader i klass 6.1 (förpackningsgrupp III stod som II) och 4 rader i klass 4.2. Ny kolumn `select_by`.
 
 ## Kända luckor
 - UN 3553, 3554, 3556 och 3557 kunde inte kontrolleras (källsidan begränsade antalet anrop). Värdena är angivna efter bästa kunskap.

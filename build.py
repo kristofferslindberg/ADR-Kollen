@@ -22,7 +22,7 @@ def compact_table():
         for r in csv.DictReader(f, delimiter=";"):
             out.setdefault(r["un_number"], []).append(
                 [r["transport_category"], r["pg_hint"], STATUS[r["status"]], r["adr_class"], r["name_en"],
-                 r["labels"], r["tunnel_code"], r["classification_code"]])
+                 r["labels"], r["tunnel_code"], r["classification_code"], r.get("select_by", "")])
     return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
 
 

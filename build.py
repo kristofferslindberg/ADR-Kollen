@@ -28,7 +28,9 @@ def compact_table():
 
 def main():
     src = (HERE / "src" / "app.html").read_text()
-    page = src.replace("/*__UN_TABLE__*/{}", compact_table())
+    import datetime
+    version = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    page = src.replace("/*__UN_TABLE__*/{}", compact_table()).replace("__VERSION__", version)
     (HERE / "index.html").write_text(page)
 
     pwa = HERE / "docs"
@@ -39,7 +41,9 @@ def main():
             '<link rel="apple-touch-icon" href="icon.svg"><meta name="apple-mobile-web-app-capable" content="yes">'
             '<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}'
             'body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style></head><body>')
-    tail = ("<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js')</script>"
+    tail = ("<script>if('serviceWorker' in navigator){let r=!navigator.serviceWorker.controller;"
+            "navigator.serviceWorker.register('sw.js');"
+            "navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!r){r=1;location.reload()}})}</script>"
             "</body></html>")
     (pwa / "index.html").write_text(head + page + tail)
     for d in ("vendor", "exempel"):

@@ -177,6 +177,7 @@ details.photo img { margin-top: 8px; border-radius: 10px; border: 2px solid var(
     <p><b>Väg, så räknas det (ADR 1.1.3.6):</b> mängd × faktor för varje rad. Transportkategori 1 = ×50, 2 = ×3, 3 = ×1, 4 = ×0. Summan får vara högst 1 000. Kategori 0 får aldrig köras utan full ADR.</p>
     <p>Mängd är liter för vätskor och kg för fasta ämnen (bruttovikt för föremål). Tryck på en rad för att rätta den om något blivit fel avläst.</p>
     <p><b>Järnväg:</b> poängundantaget finns bara i ADR. På järnväg gäller RID fullt ut för allt farligt gods, så där visas listan utan poäng.</p>
+    <p>Version __VERSION__.</p>
     <p>Hjälpmedel. Tabellen bygger på ADR 2019 Tabell A med tillägg upp till 2025. Fraktsedeln och ADR-reglerna gäller vid tvekan.</p>
     <div class="examples" aria-label="Prova med exempel">
       <button class="chip" type="button" data-ex="godsdeklaration_adr_exempel.pdf">Exempel: godsdeklaration (PDF)</button>
@@ -323,6 +324,8 @@ function pickVariant(cand, r) {
     narrow((c) => labelSet(c[5])[0] === r.cls || (!c[5] && c[3] === r.cls));
     if (distinctCats(rows) > 1) narrow((c) => sameSet(labelSet(c[5]), docLabels));
   }
+  const beforePg = rows;
+  let pgNote = "";
   if (distinctCats(rows) > 1 && r.pg) {
     if (!narrow((c) => c[1] === r.pg)) {
       // Förpackningsgruppen saknas som egen rad (samma kategori som en annan grupp):
@@ -333,6 +336,15 @@ function pickVariant(cand, r) {
       else if (r.pg === "II" && rows.length === 3) rows = [rows[1]];
     }
   }
+  // OCR tappar ofta ett streck i "III". Stämmer inte tunnelkoden på papperet med vald
+  // förpackningsgrupp men med en annan rad, litar vi på tunnelkoden.
+  if (r.pg && r.tunnel && rows.every((c) => c[6] !== r.tunnel)) {
+    const byTunnel = beforePg.filter((c) => c[6] === r.tunnel);
+    if (byTunnel.length && byTunnel.length < beforePg.length) {
+      rows = byTunnel;
+      pgNote = `Förpackningsgrupp lästes som ${r.pg} men tunnelkoden (${r.tunnel}) passar grupp ${byTunnel[0][1] || "?"}, kontrollera`;
+    }
+  }
   if (distinctCats(rows) > 1 && rows.some((c) => /benamning/.test(c[8] || ""))) {
     // T.ex. UN 2215 MALEINSYRAANHYDRID: smält form är kategori 0.
     const molten = /molten|smält|smalt/i.test((r.desc || "") + " " + (r.name || ""));
@@ -340,7 +352,7 @@ function pickVariant(cand, r) {
   }
   if (distinctCats(rows) > 1 && r.tunnel) narrow((c) => c[6] === r.tunnel);
   const row = rows.reduce((a, b) => (catNum(b) < catNum(a) ? b : a));
-  let note = "";
+  let note = pgNote;
   if (distinctCats(rows) > 1) {
     const byLabel = new Set(cand.map((c) => c[5])).size > 1;
     note = byLabel ? "Klass eller etiketter saknas, strängaste varianten används. Tryck och välj rätt"
@@ -609,10 +621,29 @@ function rotateCanvas(src, deg) {
 
 // Läser bilden som den är. Hittas inga UN-nummer vrids den 90°, 270° och 180° och läses igen,
 // så att det går att fota fraktsedeln liggande eller upp och ner.
+// Snabb gissning av om textraderna ligger vågrätt eller lodrätt i bilden: vågräta textrader
+// ger tydliga ränder i radsummorna, lodräta i kolumnsummorna. Avgör bara vilken vridning som provas först.
+function textLooksVertical(src) {
+  const k = 500 / Math.max(src.width, src.height);
+  const w = Math.max(1, Math.round(src.width * k)), h = Math.max(1, Math.round(src.height * k));
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"); g.drawImage(src, 0, 0, w, h);
+  const d = g.getImageData(0, 0, w, h).data;
+  const gray = new Float32Array(w * h); let mean = 0;
+  for (let i = 0; i < w * h; i++) { gray[i] = d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11; mean += gray[i]; }
+  mean /= w * h;
+  const rows = new Float32Array(h), cols = new Float32Array(w);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (gray[y * w + x] < mean * 0.75) { rows[y]++; cols[x]++; }
+  const stripe = (p) => { let s = 0, m = 0; for (const v of p) m += v; m /= p.length || 1;
+    for (let i = 1; i < p.length; i++) s += Math.abs(p[i] - p[i - 1]); return m ? s / p.length / m : 0; };
+  return stripe(cols) > stripe(rows) * 1.15;
+}
+
 async function ocrBest(canvas) {
   let best = null;
-  for (const deg of [0, 90, 270, 180]) {
-    if (deg) busy(true, "Vrider bilden och läser igen…", 0.3);
+  const order = textLooksVertical(canvas) ? [90, 270, 0, 180] : [0, 180, 90, 270];
+  for (const deg of order) {
+    if (deg !== order[0]) busy(true, "Vrider bilden och läser igen…", 0.3);
     const c = deg ? rotateCanvas(canvas, deg) : canvas;
     const lines = await ocrCanvas(c);
     const rows = parseLines(lines);
@@ -624,8 +655,39 @@ async function ocrBest(canvas) {
   return best;
 }
 
+// Klipper bort bordet runt papperet (papperet är ljusare än bakgrunden) så att texten blir
+// större när bilden skalas. Returnerar en canvas i full upplösning, eller bilden som den är.
+function cropPaper(img) {
+  const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+  const k = 400 / Math.max(W, H), w = Math.round(W * k), h = Math.round(H * k);
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"); g.drawImage(img, 0, 0, w, h);
+  const d = g.getImageData(0, 0, w, h).data, gray = new Uint8Array(w * h), hist = new Array(256).fill(0);
+  for (let i = 0; i < w * h; i++) { const v = (d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11) | 0; gray[i] = v; hist[v]++; }
+  // Otsu-tröskel mellan papper och bakgrund
+  let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let sB = 0, wB = 0, best = 0, t = 128;
+  for (let i = 0; i < 256; i++) { wB += hist[i]; if (!wB) continue; const wF = w * h - wB; if (!wF) break;
+    sB += i * hist[i]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) ** 2; if (v > best) { best = v; t = i; } }
+  const rowF = new Float32Array(h), colF = new Float32Array(w);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (gray[y * w + x] > t) { rowF[y] += 1 / w; colF[x] += 1 / h; }
+  const span = (p, lim) => { let a = 0, b = p.length - 1; while (a < b && p[a] < lim) a++; while (b > a && p[b] < lim) b--; return [a, b]; };
+  const [y0, y1] = span(rowF, 0.3), [x0, x1] = span(colF, 0.3);
+  const area = ((x1 - x0) * (y1 - y0)) / (w * h);
+  if (area < 0.15 || area > 0.9) return img;
+  const m = 0.02 * Math.max(w, h);
+  const cx0 = Math.max(0, (x0 - m) / k), cy0 = Math.max(0, (y0 - m) / k);
+  const cx1 = Math.min(W, (x1 + m) / k), cy1 = Math.min(H, (y1 + m) / k);
+  const out = document.createElement("canvas"); out.width = Math.round(cx1 - cx0); out.height = Math.round(cy1 - cy0);
+  out.getContext("2d").drawImage(img, cx0, cy0, cx1 - cx0, cy1 - cy0, 0, 0, out.width, out.height);
+  return out;
+}
+
+// Skalar så att den kortaste sidan blir ca 1800 px (liggande foton får då lika skarp text
+// som stående), men aldrig över 3000 px på längden.
 function imageToCanvas(img, maxW = 2200) {
-  const k = Math.min(1, maxW / img.width) * (img.width < 1200 ? 1800 / img.width : 1);
+  const short = Math.min(img.width, img.height), long = Math.max(img.width, img.height);
+  const k = maxW < 2200 ? Math.min(1, maxW / img.width) : Math.min(1800 / short, 3000 / long);
   const c = document.createElement("canvas");
   c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
   const g = c.getContext("2d");
@@ -682,7 +744,7 @@ async function handleFile(file, label) {
     if (isPdf) ({ lines, preview } = await readPdf(await file.arrayBuffer()));
     else {
       const img = await loadImage(file);
-      const c = imageToCanvas(img);
+      const c = imageToCanvas(cropPaper(img));
       const best = await ocrBest(c);
       lines = best.lines;
       const pv = document.createElement("canvas"), k = Math.min(1, 1000 / best.canvas.width);

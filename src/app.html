@@ -118,6 +118,9 @@ details.photo img { margin-top: 8px; border-radius: 10px; border: 2px solid var(
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
 .seg button { appearance: none; border: 2px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 10px; padding: 12px 0; font: 600 1.1rem var(--body); cursor: pointer; }
 .seg button[aria-pressed="true"] { background: var(--press); color: var(--press-ink); border-color: var(--press); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { appearance: none; border: 2px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 10px; padding: 10px 12px; font: 600 1rem var(--body); cursor: pointer; }
+.chips button[aria-pressed="true"] { background: var(--press); color: var(--press-ink); border-color: var(--press); }
 .qty { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
 .qty .seg { grid-auto-columns: 64px; }
 .sheet .btn-row .btn { font-size: 1.05rem; }
@@ -189,6 +192,10 @@ details.photo img { margin-top: 8px; border-radius: 10px; border: 2px solid var(
       <label for="fUn">UN-nummer</label>
       <input id="fUn" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="t.ex. 1203">
       <div class="lookup" id="fLookup"></div>
+    </div>
+    <div class="field" id="fLabelsField" hidden>
+      <span class="lbl">Klass och etiketter (står efter namnet på fraktsedeln)</span>
+      <div class="chips" id="fLabels"></div>
     </div>
     <div class="field">
       <span class="lbl">Förpackningsgrupp</span>
@@ -288,7 +295,11 @@ function parseLines(lines) {
     name = name.replace(/[|\[\]]+/g, " ").replace(/\s+/g, " ").trim();
     const warn = [];
     if (conf < 70) warn.push("osäker avläsning, kontrollera");
-    rows.push({ idType, un, name, cls: clsM ? clsM[1] : "", pg: pgM ? "I".repeat(pgM[1].length) : "",
+    // Sekundära faror står inom parentes efter klassen, t.ex. "2.1 (8)" eller "6.1 (3, 8)".
+    const subs = [];
+    for (const pm of head.matchAll(/\(\s*([1-9](?:\.[1-9])?(?:\s*[,+]\s*[1-9](?:\.[1-9])?)*)\s*\)/g)) subs.push(...pm[1].split(/\s*[,+]\s*/));
+    const tunM = head.match(/\(\s*([A-E](?:\d{4})?[A-E]?(?:\/[A-E])?|-)\s*\)/);
+    rows.push({ idType, un, name, subs, tunnel: tunM ? tunM[1] : "", cls: clsM ? clsM[1] : "", pg: pgM ? "I".repeat(pgM[1].length) : "",
                 qty: q ? q.qty : null, unit: q ? q.unit : "L", gross: q ? q.gross : false, warn });
   }
   // UN-nummer som bara nämns i löptext (t.ex. "kollin med UN 3107 ska skyddas...") och redan finns
@@ -297,20 +308,51 @@ function parseLines(lines) {
 }
 
 /* ------------------------------------------------------------ beräkning 1.1.3.6 */
+const labelSet = (s) => String(s || "").split("+").map((x) => x.trim()).filter(Boolean);
+const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+const catNum = (c) => (c[0] === "" ? 99 : parseInt(c[0], 10));
+const distinctCats = (rows) => new Set(rows.map((c) => c[0])).size;
+
+// Väljer rätt rad i Tabell A när ett UN-nummer har flera varianter (olika förpackningsgrupp,
+// klassificeringskod eller etiketter, t.ex. UN 1950 AEROSOLER 2.1 / 2.2 / 2.1 (8)).
+function pickVariant(cand, r) {
+  let rows = cand;
+  const narrow = (f) => { const n = rows.filter(f); if (n.length) rows = n; return n.length > 0; };
+  if (distinctCats(rows) > 1 && r.cls) {
+    const docLabels = [r.cls, ...(r.subs || [])];
+    narrow((c) => labelSet(c[5])[0] === r.cls || (!c[5] && c[3] === r.cls));
+    if (distinctCats(rows) > 1) narrow((c) => sameSet(labelSet(c[5]), docLabels));
+  }
+  if (distinctCats(rows) > 1 && r.pg) {
+    if (!narrow((c) => c[1] === r.pg)) {
+      // Förpackningsgruppen saknas som egen rad (samma kategori som en annan grupp):
+      // grupp III är alltid den minst stränga, grupp I den strängaste, grupp II mitten av tre rader.
+      const real = rows.filter((c) => c[0] !== "" && c[0] !== "0");
+      if (r.pg === "III" && real.length) { const m = Math.max(...real.map(catNum)); rows = real.filter((c) => catNum(c) === m); }
+      else if (r.pg === "I") { const m = Math.min(...rows.map(catNum)); rows = rows.filter((c) => catNum(c) === m); }
+      else if (r.pg === "II" && rows.length === 3) rows = [rows[1]];
+    }
+  }
+  if (distinctCats(rows) > 1 && r.tunnel) narrow((c) => c[6] === r.tunnel);
+  const row = rows.reduce((a, b) => (catNum(b) < catNum(a) ? b : a));
+  let note = "";
+  if (distinctCats(rows) > 1) {
+    const byLabel = new Set(cand.map((c) => c[5])).size > 1;
+    note = byLabel ? "Klass eller etiketter saknas, strängaste varianten används. Tryck och välj rätt"
+                   : "Förpackningsgrupp saknas, strängaste kategorin används";
+  }
+  return { row, note };
+}
+
 function calcRow(r) {
   const out = { ...r, cat: "", mult: null, pts: 0, notes: [...(r.warn || [])], stop: null, tableName: "" };
   if (r.idType === "ID") { out.stop = `ID ${r.un} är ett flygnummer, inte giltigt på väg eller järnväg`; return out; }
   const cand = UN[r.un];
   if (!cand) { out.stop = `UN ${r.un} finns inte i tabellen`; out.notes.push("Okänt UN-nummer, kontrollera siffrorna"); return out; }
-  let pick = cand;
-  if (new Set(cand.map((c) => c[0])).size > 1) {
-    const byPg = cand.filter((c) => c[1] && c[1] === r.pg);
-    if (byPg.length) pick = byPg;
-    else out.notes.push("Förpackningsgrupp saknas, strängaste kategorin används");
-  }
-  const c = pick.reduce((a, b) => (parseInt(b[0] || "99") < parseInt(a[0] || "99") ? b : a));
+  const { row: c, note } = pickVariant(cand, r);
+  if (note) out.notes.push(note);
   out.cat = c[0]; out.tableName = c[4];
-  if (r.cls && c[3] && r.cls !== c[3]) out.notes.push(`Klass ${r.cls} på papperet, ${c[3]} i tabellen`);
+  if (r.cls && c[3] && r.cls !== c[3] && r.cls !== labelSet(c[5])[0]) out.notes.push(`Klass ${r.cls} på papperet, ${c[3]} i tabellen`);
   if (c[2] === "0") out.stop = `UN ${r.un} är transportkategori 0`;
   else if (c[2] === "F") out.stop = `UN ${r.un} får inte transporteras enligt ADR`;
   else if (c[2] === "E") out.notes.push("Omfattas inte av ADR");
@@ -459,7 +501,7 @@ function toast(msg) {
 }
 
 /* ------------------------------------------------------------ rätta rad */
-let editIdx = -1, editPg = "", editUnit = "L";
+let editIdx = -1, editPg = "", editUnit = "L", editLabels = "";
 function setSeg(id, v) { $(id).querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v))); }
 function lookup() {
   const v = $("fUn").value.trim(), el = $("fLookup");
@@ -468,14 +510,27 @@ function lookup() {
   const c = UN[v];
   if (!c) { el.textContent = "Finns inte i tabellen"; el.classList.add("bad"); return; }
   const cats = [...new Set(c.map((x) => x[0]))];
-  el.textContent = `${c[0][4]} · klass ${c[0][3]} · kategori ${cats.join("/")}${cats.length > 1 ? " (beror på förp.grp)" : ""}`;
+  const sets = [...new Set(c.map((x) => x[5]))];
+  const byLabel = cats.length > 1 && sets.length > 1;
+  el.textContent = `${c[0][4]} · klass ${c[0][3]} · kategori ${cats.join("/")}` +
+    (cats.length > 1 ? (byLabel ? " (beror på klass och etiketter)" : " (beror på förp.grp)") : "");
+  $("fLabelsField").hidden = !byLabel;
+  if (byLabel) {
+    $("fLabels").innerHTML = sets.map((l) => `<button type="button" data-v="${esc(l)}" aria-pressed="${l === editLabels}">${esc(l)}</button>`).join("");
+  }
 }
+$("fLabels").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-v]"); if (!b) return;
+  editLabels = b.dataset.v; setSeg("fLabels", editLabels);
+});
 function openSheet(i) {
   editIdx = i;
   const r = i >= 0 ? state.rows[i] : { un: "", pg: "", qty: null, unit: "L" };
   $("sheetTitle").textContent = i >= 0 ? "Rätta rad" : "Lägg till rad";
   $("fUn").value = r.un; $("fQty").value = r.qty == null ? "" : String(r.qty).replace(".", ",");
   editPg = r.pg || ""; editUnit = r.unit || "L";
+  editLabels = r.cls ? [r.cls, ...(r.subs || [])].join(" + ") : "";
+  $("fLabelsField").hidden = true;
   setSeg("fPg", editPg); setSeg("fUnit", editUnit); lookup();
   $("fDel").hidden = i < 0;
   $("sheetBg").hidden = false;
@@ -495,7 +550,10 @@ $("sheet").addEventListener("submit", (e) => {
   const qty = qv === "" || isNaN(+qv) ? null : +qv;
   const old = editIdx >= 0 ? state.rows[editIdx] : null;
   const name = old && old.un === un ? old.name : (UN[un] ? UN[un][0][4] : "");
-  const row = { idType: "UN", un, name, cls: old && old.un === un ? old.cls : "", pg: editPg, qty, unit: editUnit, gross: false, warn: [] };
+  const same = old && old.un === un;
+  const lab = !$("fLabelsField").hidden && editLabels ? labelSet(editLabels) : null;
+  const row = { idType: "UN", un, name, cls: lab ? lab[0] : same ? old.cls : "", subs: lab ? lab.slice(1) : same ? old.subs || [] : [],
+                tunnel: same ? old.tunnel || "" : "", pg: editPg, qty, unit: editUnit, gross: false, warn: [] };
   if (old) state.rows[editIdx] = row; else state.rows.push(row);
   if (state.example) { state.example = false; state.source = "Egen inmatning"; if (!old) state.rows = [row]; }
   closeSheet(); render();

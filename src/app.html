@@ -1,0 +1,645 @@
+<title>ADR-kollen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: en kolumn för telefonen. Stora knappar överst, beslutet som en hel färgad skylt, sedan raderna som ADR-skyltar. */
+:root {
+  --bg: #eef0ee;
+  --surface: #ffffff;
+  --fg: #15191c;
+  --muted: #59626a;
+  --line: #d5d9d6;
+  --plate: #f28c00;          /* ADR-orange skylt */
+  --plate-ink: #111;
+  --ok: #17713a;
+  --ok-ink: #ffffff;
+  --stop: #bf1f17;
+  --stop-ink: #ffffff;
+  --warn: #8a5a00;
+  --warn-bg: #fff3d6;
+  --press: #15191c;
+  --press-ink: #ffffff;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "Barlow", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101315; --surface: #1a1f22; --fg: #eef1f2; --muted: #9ba5ac; --line: #2c3337;
+    --ok: #2f9a55; --stop: #d8352b; --warn: #f2c25b; --warn-bg: #3a2e12;
+    --press: #eef1f2; --press-ink: #101315; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101315; --surface: #1a1f22; --fg: #eef1f2; --muted: #9ba5ac; --line: #2c3337;
+  --ok: #2f9a55; --stop: #d8352b; --warn: #f2c25b; --warn-bg: #3a2e12;
+  --press: #eef1f2; --press-ink: #101315; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 17px/1.45 var(--body); }
+.wrap { max-width: 34rem; margin: 0 auto; padding-inline: 16px; padding-block: 14px 48px; display: flex; flex-direction: column; gap: 18px; }
+header.top { display: flex; align-items: center; gap: 12px; }
+.logo { width: 46px; height: 34px; background: var(--plate); border: 3px solid var(--plate-ink); border-radius: 3px; display: grid; place-items: center; font: 700 15px/1 var(--display); color: var(--plate-ink); letter-spacing: .04em; flex: none; }
+h1 { font: 700 1.7rem/1 var(--display); margin: 0; letter-spacing: .01em; }
+.sub { color: var(--muted); font-size: .9rem; margin: 2px 0 0; }
+
+.actions { display: grid; gap: 10px; }
+.mode { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--surface); padding: 5px; border-radius: 14px; box-shadow: inset 0 0 0 2px var(--line); }
+.mode button { appearance: none; border: 0; background: transparent; color: var(--fg); border-radius: 10px; padding: 12px 6px; font: 600 1.05rem/1.15 var(--body); cursor: pointer; }
+.mode button small { display: block; font-weight: 500; font-size: .8rem; color: var(--muted); }
+.mode button[aria-pressed="true"] { background: var(--press); color: var(--press-ink); }
+.mode button[aria-pressed="true"] small { color: inherit; opacity: .8; }
+.btn { appearance: none; border: 0; border-radius: 14px; font: 600 1.15rem/1.2 var(--body); padding: 18px 20px; display: flex; align-items: center; justify-content: center; gap: 12px; cursor: pointer; width: 100%; text-decoration: none; }
+.btn svg { width: 28px; height: 28px; flex: none; }
+.btn-main { background: var(--plate); color: var(--plate-ink); font-size: 1.3rem; padding: 24px 20px; box-shadow: inset 0 0 0 3px var(--plate-ink); }
+.btn-sec { background: var(--surface); color: var(--fg); box-shadow: inset 0 0 0 2px var(--line); }
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn-row .btn { font-size: 1rem; padding: 14px 10px; }
+.btn:focus-visible, .row:focus-visible, .chip:focus-visible, input:focus-visible { outline: 3px solid var(--plate); outline-offset: 2px; }
+.btn:active { transform: scale(.985); }
+
+.busy { background: var(--surface); border-radius: 14px; padding: 18px; display: grid; gap: 10px; box-shadow: inset 0 0 0 2px var(--line); }
+.busy b { font-size: 1.1rem; }
+.bar { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--plate); transition: width .3s; }
+.err { background: var(--warn-bg); color: var(--fg); border-radius: 12px; padding: 14px 16px; }
+
+.tag { align-self: flex-start; font: 600 .78rem/1 var(--body); letter-spacing: .08em; text-transform: uppercase; padding: 6px 10px; border-radius: 6px; background: var(--warn-bg); color: var(--warn); }
+.srcline { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: .92rem; }
+.srcline span { min-width: 0; overflow-wrap: anywhere; }
+
+.verdict { border-radius: 16px; padding: 22px 20px 20px; display: grid; gap: 6px; }
+.verdict.ok { background: var(--ok); color: var(--ok-ink); }
+.verdict.stop { background: var(--stop); color: var(--stop-ink); }
+.verdict .big { font: 700 2.3rem/1 var(--display); text-transform: uppercase; letter-spacing: .01em; text-wrap: balance; display: flex; align-items: center; gap: 12px; }
+.verdict .big svg { width: 42px; height: 42px; flex: none; }
+.verdict .score { font: 600 1.25rem/1.2 var(--body); font-variant-numeric: tabular-nums; }
+.meter { height: 14px; border-radius: 7px; background: rgba(255,255,255,.28); position: relative; margin-top: 8px; }
+.meter i { position: absolute; inset: 0 auto 0 0; border-radius: 7px; background: #fff; }
+.meter-scale { display: flex; justify-content: space-between; font-size: .8rem; opacity: .9; font-variant-numeric: tabular-nums; }
+.verdict ul { margin: 8px 0 0; padding-left: 1.2em; }
+.verdict li { margin: 2px 0; }
+.verdict .req { font-size: .95rem; opacity: .95; margin-top: 6px; }
+
+h2 { font: 700 1.3rem/1.1 var(--display); margin: 6px 0 0; letter-spacing: .02em; text-transform: uppercase; }
+.list { display: grid; gap: 10px; }
+.row { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; background: var(--surface); border-radius: 14px; padding: 12px; box-shadow: inset 0 0 0 2px var(--line); cursor: pointer; text-align: left; border: 0; color: var(--fg); font: inherit; width: 100%; }
+.row.warn { box-shadow: inset 0 0 0 3px var(--warn); }
+.row.bad { box-shadow: inset 0 0 0 3px var(--stop); }
+.plate { width: 64px; background: var(--plate); border: 3px solid var(--plate-ink); border-radius: 4px; color: var(--plate-ink); text-align: center; font-family: var(--display); line-height: 1; padding: 4px 0 5px; }
+.plate small { display: block; font-size: .72rem; font-weight: 700; letter-spacing: .1em; border-bottom: 2px solid var(--plate-ink); padding-bottom: 3px; margin-bottom: 3px; }
+.plate b { font-size: 1.35rem; font-weight: 700; letter-spacing: .02em; }
+.mid { min-width: 0; }
+.name { font-weight: 600; overflow-wrap: anywhere; line-height: 1.25; }
+.facts { color: var(--muted); font-size: .88rem; }
+.calc { font-size: .95rem; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.note { font-size: .86rem; color: var(--warn); margin-top: 3px; }
+.row.bad .note { color: var(--stop); }
+.pts { text-align: right; font: 700 1.6rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.pts small { display: block; font: 500 .75rem/1.2 var(--body); color: var(--muted); }
+.empty { color: var(--muted); background: var(--surface); border-radius: 14px; padding: 16px; box-shadow: inset 0 0 0 2px var(--line); }
+.hint { color: var(--muted); font-size: .9rem; margin: -4px 0 0; }
+
+.foot { color: var(--muted); font-size: .88rem; display: grid; gap: 8px; border-top: 2px solid var(--line); padding-top: 14px; }
+.foot p { margin: 0; }
+.examples { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { appearance: none; border: 0; background: var(--surface); color: var(--fg); box-shadow: inset 0 0 0 2px var(--line); border-radius: 999px; padding: 9px 14px; font: 500 .92rem var(--body); cursor: pointer; }
+details.photo summary { cursor: pointer; color: var(--muted); font-size: .92rem; }
+details.photo img { margin-top: 8px; border-radius: 10px; border: 2px solid var(--line); }
+
+.sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
+.sheet { background: var(--surface); color: var(--fg); width: 100%; max-width: 34rem; border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; max-height: 92%; overflow-y: auto; }
+.sheet h3 { font: 700 1.5rem/1 var(--display); margin: 0; text-transform: uppercase; }
+.field { display: grid; gap: 6px; }
+.field label, .field .lbl { font-weight: 600; font-size: .95rem; }
+.field input { font: 600 1.4rem var(--body); padding: 12px 14px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg); color: var(--fg); width: 100%; min-width: 0; font-variant-numeric: tabular-nums; }
+.lookup { font-size: .9rem; color: var(--muted); min-height: 1.3em; }
+.lookup.bad { color: var(--stop); font-weight: 600; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.seg button { appearance: none; border: 2px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 10px; padding: 12px 0; font: 600 1.1rem var(--body); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--press); color: var(--press-ink); border-color: var(--press); }
+.qty { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+.qty .seg { grid-auto-columns: 64px; }
+.sheet .btn-row .btn { font-size: 1.05rem; }
+.btn-del { background: transparent; color: var(--stop); box-shadow: inset 0 0 0 2px var(--stop); }
+.btn-ok { background: var(--press); color: var(--press-ink); }
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--press); color: var(--press-ink); padding: 12px 18px; border-radius: 12px; font-weight: 600; z-index: 20; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="logo" aria-hidden="true">ADR</div>
+    <div>
+      <h1>ADR-kollen</h1>
+      <p class="sub">Farligt gods på väg och järnväg. Fota fraktsedeln.</p>
+    </div>
+  </header>
+
+  <div class="mode" id="mode" role="group" aria-label="Transportsätt">
+    <button type="button" data-mode="vag">Väg<small>ADR</small></button>
+    <button type="button" data-mode="jarnvag">Järnväg<small>RID</small></button>
+  </div>
+
+  <section class="actions" aria-label="Läs av">
+    <button class="btn btn-main" id="btnPhoto" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>
+      Fota fraktsedeln
+    </button>
+    <div class="btn-row">
+      <button class="btn btn-sec" id="btnFile" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/></svg>
+        Välj PDF / bild
+      </button>
+      <button class="btn btn-sec" id="btnManual" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>
+        Skriv in själv
+      </button>
+    </div>
+    <input type="file" id="inPhoto" accept="image/*" capture="environment" hidden>
+    <input type="file" id="inFile" accept="image/*,application/pdf,.pdf" hidden>
+  </section>
+
+  <section class="busy" id="busy" hidden aria-live="polite">
+    <b id="busyText">Läser av fraktsedeln…</b>
+    <div class="bar"><i id="busyBar"></i></div>
+    <span class="hint" id="busyHint">Första gången tar det lite längre tid.</span>
+  </section>
+  <div class="err" id="err" hidden role="alert"></div>
+
+  <main id="result" aria-live="polite"></main>
+
+  <footer class="foot">
+    <p>Appen gäller bara väg (ADR) och järnväg (RID). Flygdokument (IATA) och ID-nummer godtas inte.</p>
+    <p><b>Väg, så räknas det (ADR 1.1.3.6):</b> mängd × faktor för varje rad. Transportkategori 1 = ×50, 2 = ×3, 3 = ×1, 4 = ×0. Summan får vara högst 1 000. Kategori 0 får aldrig köras utan full ADR.</p>
+    <p>Mängd är liter för vätskor och kg för fasta ämnen (bruttovikt för föremål). Tryck på en rad för att rätta den om något blivit fel avläst.</p>
+    <p><b>Järnväg:</b> poängundantaget finns bara i ADR. På järnväg gäller RID fullt ut för allt farligt gods, så där visas listan utan poäng.</p>
+    <p>Hjälpmedel. Tabellen bygger på ADR 2019 Tabell A med tillägg upp till 2025. Fraktsedeln och ADR-reglerna gäller vid tvekan.</p>
+    <div class="examples" aria-label="Prova med exempel">
+      <button class="chip" type="button" data-ex="godsdeklaration_adr_exempel.pdf">Exempel: godsdeklaration (PDF)</button>
+      <button class="chip" type="button" data-ex="adr_syntetisk.png">Exempel: fraktsedel (foto)</button>
+    </div>
+  </footer>
+</div>
+
+<div class="sheet-bg" id="sheetBg" hidden>
+  <form class="sheet" id="sheet" autocomplete="off">
+    <h3 id="sheetTitle">Rätta rad</h3>
+    <div class="field">
+      <label for="fUn">UN-nummer</label>
+      <input id="fUn" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="t.ex. 1203">
+      <div class="lookup" id="fLookup"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">Förpackningsgrupp</span>
+      <div class="seg" id="fPg">
+        <button type="button" data-v="">Vet ej</button>
+        <button type="button" data-v="I">I</button>
+        <button type="button" data-v="II">II</button>
+        <button type="button" data-v="III">III</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="fQty">Mängd</label>
+      <div class="qty">
+        <input id="fQty" inputmode="decimal" placeholder="t.ex. 200">
+        <div class="seg" id="fUnit">
+          <button type="button" data-v="L">L</button>
+          <button type="button" data-v="kg">kg</button>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-del" type="button" id="fDel">Ta bort rad</button>
+      <button class="btn btn-ok" type="submit">Klar</button>
+    </div>
+  </form>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/tess/tesseract.min.js"></script>
+<script>
+"use strict";
+const UN = /*__UN_TABLE__*/{};
+const MULT = { "1": 50, "2": 3, "3": 1, "4": 0 };
+const LIMIT = 1000;
+const $ = (id) => document.getElementById(id);
+const nf = (n) => Number(n).toLocaleString("sv-SE", { maximumFractionDigits: 2 });
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const base = (p) => new URL(p, document.baseURI).href;
+
+/* ------------------------------------------------------------ tolkning av text */
+// UN/ID följt av fyra siffror. I början av en rad tolereras vanliga OCR-fel som "JUN 1993" och "IN 1263".
+const UN_RE = /(?:^[^A-Za-z0-9]*(?:J?U\s?N|IN|1N|ID)|\b(?:U\s?N|ID))\s*[-:.]?\s*([0-9OoIl]{4})(?![0-9])/i;
+const NUM = "(\\d+(?:[.,]\\d+)?)";
+const UNIT = "(kg|kilo|liter|ltr|ml|l|g)";
+const STOPWORD = "(?![A-Za-zåäöÅÄÖ])";
+
+function toBase(q, unit) {
+  const u = unit.toLowerCase();
+  if (u === "ml") return [q / 1000, "L"];
+  if (u === "g") return [q / 1000, "kg"];
+  if (u === "kg" || u === "kilo") return [q, "kg"];
+  return [q, "L"];
+}
+
+function findQuantity(text) {
+  let s = text.replace(/×/g, "x").replace(/(\d) (?=\d{3}\b)/g, "$1").replace(/(\d),(\d)/g, "$1.$2");
+  s = s.replace(/(\d)(L|kg|l)\b/g, "$1 $2");
+  let m = s.match(new RegExp("\\b(\\d+)\\s+[A-Za-zåäöÅÄÖ .()0-9]{0,40}?\\s?x\\s*" + NUM + "\\s*" + UNIT + STOPWORD + "(\\s*\\(?(brutto|G)\\b)?", "i"))
+       || s.match(new RegExp("\\b(\\d+)\\s*x\\s*" + NUM + "\\s*" + UNIT + STOPWORD + "(\\s*\\(?(brutto|G)\\b)?", "i"));
+  if (m) {
+    const [q, u] = toBase(parseInt(m[1], 10) * parseFloat(m[2]), m[3]);
+    return { qty: q, unit: u, gross: !!m[5], text: m[0].trim() };
+  }
+  m = s.match(new RegExp("\\b" + NUM + "\\s*" + UNIT + STOPWORD + "(\\s*\\(?(brutto|netto|G)\\b)?", "i"));
+  if (m) {
+    const [q, u] = toBase(parseFloat(m[1]), m[2]);
+    return { qty: q, unit: u, gross: !!(m[4] && /brutto|^G$/.test(m[4])), text: m[0].trim() };
+  }
+  return null;
+}
+
+function parseLines(lines) {
+  const rows = [];
+  for (let i = 0; i < lines.length; i++) {
+    const ln = lines[i].text;
+    const m = ln.match(UN_RE);
+    if (!m) continue;
+    const idType = /ID\s*[-:.]?\s*[0-9OoIl]{4}$/i.test(m[0]) ? "ID" : "UN";
+    const un = m[1].replace(/[Oo]/g, "0").replace(/[Il]/g, "1");
+    const rest = ln.slice(m.index + m[0].length).replace(/^[\s,.:;-]+/, "");
+    let q = findQuantity(rest);
+    let conf = lines[i].conf;
+    // Står UN-numret först på raden (tabellcell) kan mängden ligga på nästa rad.
+    for (let j = i + 1; !q && m.index < 3 && j < Math.min(lines.length, i + 3); j++) {
+      if (UN_RE.test(lines[j].text)) break;
+      q = findQuantity(lines[j].text);
+      conf = Math.min(conf, lines[j].conf);
+    }
+    const head = q ? rest.slice(0, Math.max(0, rest.indexOf(q.text.split(/\s/)[0]))) || rest : rest;
+    const clsM = head.match(/(?:^|[\s,])([1-9](?:\.[1-9])?)(?=[\s,(]|$)(?!\s*(?:l|kg|ml|g|x)\b)/i);
+    const pgM = head.match(/(?:^|[\s,(])(III|II|I)(?=[\s,)]|$)/);
+    let name = rest.includes(",") ? rest.split(",")[0] : (clsM ? head.slice(0, clsM.index) : head);
+    name = name.replace(/[|\[\]]+/g, " ").replace(/\s+/g, " ").trim();
+    const warn = [];
+    if (conf < 70) warn.push("osäker avläsning, kontrollera");
+    rows.push({ idType, un, name, cls: clsM ? clsM[1] : "", pg: pgM ? pgM[1] : "",
+                qty: q ? q.qty : null, unit: q ? q.unit : "L", gross: q ? q.gross : false, warn });
+  }
+  // UN-nummer som bara nämns i löptext (t.ex. "kollin med UN 3107 ska skyddas...") och redan finns
+  // som rad med mängd tas bort.
+  return rows.filter((r) => r.qty != null || !rows.some((o) => o !== r && o.un === r.un && o.qty != null));
+}
+
+/* ------------------------------------------------------------ beräkning 1.1.3.6 */
+function calcRow(r) {
+  const out = { ...r, cat: "", mult: null, pts: 0, notes: [...(r.warn || [])], stop: null, tableName: "" };
+  if (r.idType === "ID") { out.stop = `ID ${r.un} är ett flygnummer, inte giltigt på väg eller järnväg`; return out; }
+  const cand = UN[r.un];
+  if (!cand) { out.stop = `UN ${r.un} finns inte i tabellen`; out.notes.push("Okänt UN-nummer, kontrollera siffrorna"); return out; }
+  let pick = cand;
+  if (new Set(cand.map((c) => c[0])).size > 1) {
+    const byPg = cand.filter((c) => c[1] && c[1] === r.pg);
+    if (byPg.length) pick = byPg;
+    else out.notes.push("Förpackningsgrupp saknas, strängaste kategorin används");
+  }
+  const c = pick.reduce((a, b) => (parseInt(b[0] || "99") < parseInt(a[0] || "99") ? b : a));
+  out.cat = c[0]; out.tableName = c[4];
+  if (r.cls && c[3] && r.cls !== c[3]) out.notes.push(`Klass ${r.cls} på papperet, ${c[3]} i tabellen`);
+  if (c[2] === "0") out.stop = `UN ${r.un} är transportkategori 0`;
+  else if (c[2] === "F") out.stop = `UN ${r.un} får inte transporteras enligt ADR`;
+  else if (c[2] === "E") out.notes.push("Omfattas inte av ADR");
+  else if (c[2] === "N") out.notes.push("Ingen transportkategori i tabellen, kontrollera");
+  out.mult = MULT[c[0]] ?? null;
+  if (r.qty == null) out.stop = out.stop || `UN ${r.un}: mängden kunde inte läsas`;
+  else if (out.mult != null) out.pts = r.qty * out.mult;
+  return out;
+}
+
+function calculate(rows) {
+  const calc = rows.map(calcRow);
+  const total = calc.reduce((s, r) => s + r.pts, 0);
+  const stops = calc.filter((r) => r.stop).map((r) => r.stop);
+  if (state.mode === "jarnvag") {
+    // RID har inget poängundantag: allt farligt gods kräver full RID.
+  if (state.air) stops.unshift("Det här är ett flygdokument (IATA). Begär ett transportdokument för väg eller järnväg");
+    const dg = calc.filter((r) => r.idType === "UN" && UN[r.un] && !UN[r.un].every((c) => c[2] === "E"));
+    if (dg.length) stops.push(`${dg.length} ${dg.length === 1 ? "rad" : "rader"} farligt gods, full RID gäller`);
+    if (!rows.length) stops.push("Inga UN-nummer hittades");
+    return { calc, total, ok: stops.length === 0, stops };
+  }
+  if (total > LIMIT) stops.unshift(`Summan ${nf(total)} är över gränsen ${nf(LIMIT)}`);
+  if (state.air) stops.unshift("Det här är ett flygdokument (IATA). Begär ett transportdokument för väg eller järnväg");
+  if (!rows.length) stops.push("Inga UN-nummer hittades");
+  return { calc, total, ok: stops.length === 0, stops };
+}
+
+/* ------------------------------------------------------------ tillstånd och rendering */
+let savedMode = "vag";
+try { savedMode = localStorage.getItem("adr-mode") || "vag"; } catch (e) {}
+let state = {
+  mode: savedMode,
+  air: false,
+  example: true,
+  source: "Exempel: godsdeklaration (PDF)",
+  img: null,
+  rows: [
+    { idType: "UN", un: "1203", name: "BENSIN", cls: "3", pg: "II", qty: 800, unit: "L", gross: false, warn: [] },
+    { idType: "UN", un: "1263", name: "FÄRG", cls: "3", pg: "III", qty: 200, unit: "L", gross: false, warn: [] },
+  ],
+};
+
+const ICON_OK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"/></svg>';
+const ICON_STOP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" aria-hidden="true"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8z"/><path d="M7 12h10" stroke-linecap="round"/></svg>';
+
+function render() {
+  const { calc, total, ok, stops } = calculate(state.rows);
+  const pct = Math.min(100, (total / LIMIT) * 100);
+  const h = [];
+  if (state.example) h.push('<span class="tag">Exempel, inte din last</span>');
+  h.push(`<div class="srcline"><span>${esc(state.source)}</span></div>`);
+  const rail = state.mode === "jarnvag";
+  if (rail && ok) {
+    h.push(`<section class="verdict ok"><div class="big">${ICON_OK}Inget farligt gods</div>
+      <div class="req">Inga rader omfattas av RID.</div></section>`);
+  } else if (rail) {
+    h.push(`<section class="verdict stop">
+      <div class="big">${ICON_STOP}Full RID gäller</div>
+      <ul>${stops.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
+      <div class="req">Järnväg har inget poängundantag. Kräver transportdokument enligt RID, orange skyltar och etiketter på vagn eller container, och utbildad personal (RID 1.3).</div>
+    </section>`);
+  } else if (ok) {
+    h.push(`<section class="verdict ok">
+      <div class="big">${ICON_OK}OK att köra</div>
+      <div class="score">${nf(total)} av ${nf(LIMIT)} poäng</div>
+      <div class="meter" aria-hidden="true"><i style="width:${pct}%"></i></div>
+      <div class="meter-scale"><span>0</span><span>1 000</span></div>
+      <div class="req">Under gränsen, full ADR behövs inte. Det här gäller ändå: transportdokumentet ska följa med, minst en 2 kg brandsläckare, kollin märkta och etiketterade, och du ska ha utbildning för farligt gods (ADR 1.3).</div>
+    </section>`);
+  } else {
+    h.push(`<section class="verdict stop">
+      <div class="big">${ICON_STOP}Får inte köras utan full ADR</div>
+      <div class="score">${nf(total)} av ${nf(LIMIT)} poäng</div>
+      <div class="meter" aria-hidden="true"><i style="width:${pct}%"></i></div>
+      <div class="meter-scale"><span>0</span><span>1 000</span></div>
+      <ul>${stops.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
+      <div class="req">Kräver förare med ADR-intyg, orange skyltar fram och bak, skriftliga instruktioner och full ADR-utrustning.</div>
+    </section>`);
+  }
+  h.push(`<h2>Lasten, rad för rad</h2>`);
+  if (calc.some((r) => r.notes.length || r.stop)) h.push('<p class="hint">Rader med färgad kant behöver kontrolleras. Tryck på raden för att rätta.</p>');
+  h.push('<div class="list">');
+  if (!calc.length) h.push('<div class="empty">Inga rader ännu. Fota fraktsedeln eller tryck "Lägg till rad".</div>');
+  calc.forEach((r, i) => {
+    const cls = r.stop ? "bad" : r.notes.length ? "warn" : "";
+    const qty = r.qty == null ? "? " + r.unit : `${nf(r.qty)} ${r.unit}${r.gross ? " brutto" : ""}`;
+    const facts = [r.cls && `Klass ${r.cls}`, r.pg && `Förp.grp ${r.pg}`, !rail && r.cat !== "" && `Kategori ${r.cat}`].filter(Boolean).join(" · ");
+    const formula = !rail && r.mult != null && r.qty != null ? `${qty} × ${r.mult} = ${nf(r.pts)} poäng` : qty;
+    const note = [r.stop, ...(rail ? r.notes.filter((n) => !/kategori/i.test(n)) : r.notes)].filter(Boolean).join(". ");
+    h.push(`<button class="row ${cls}" type="button" data-i="${i}" aria-label="Rätta rad ${i + 1}">
+      <div class="plate"><small>${r.idType}</small><b>${esc(r.un)}</b></div>
+      <div class="mid">
+        <div class="name">${esc(r.name || r.tableName || "Okänd benämning")}</div>
+        <div class="facts">${esc(facts)}</div>
+        <div class="calc">${esc(formula)}</div>
+        ${note ? `<div class="note">${esc(note)}</div>` : ""}
+      </div>
+      ${rail ? "" : `<div class="pts">${nf(r.pts)}<small>poäng</small></div>`}
+    </button>`);
+  });
+  h.push("</div>");
+  h.push(`<div class="btn-row">
+    <button class="btn btn-sec" type="button" id="btnAdd">+ Lägg till rad</button>
+    <button class="btn btn-sec" type="button" id="btnCopy">Kopiera listan</button>
+  </div>`);
+  if (state.img) h.push(`<details class="photo"><summary>Visa fotot som lästes av</summary><img src="${state.img}" alt="Avläst fraktsedel"></details>`);
+  document.querySelectorAll("#mode button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === state.mode)));
+  $("result").innerHTML = h.join("");
+  $("result").style.display = "grid";
+  $("result").style.gap = "14px";
+  $("result").querySelectorAll(".row").forEach((b) => b.addEventListener("click", () => openSheet(+b.dataset.i)));
+  $("btnAdd").addEventListener("click", () => openSheet(-1));
+  $("btnCopy").addEventListener("click", copyList);
+}
+
+function summaryText() {
+  const { calc, total, ok, stops } = calculate(state.rows);
+  const rail = state.mode === "jarnvag";
+  const L = [`ADR-kollen (${rail ? "järnväg, RID" : "väg, ADR"}): ${state.source}`, ""];
+  calc.forEach((r) => {
+    const q = r.qty == null ? "?" : `${nf(r.qty)} ${r.unit}`;
+    L.push(`${r.idType} ${r.un} ${r.name || r.tableName}${r.pg ? ", förp.grp " + r.pg : ""}: ${q}` +
+      (!rail && r.mult != null && r.qty != null ? ` × ${r.mult} = ${nf(r.pts)} poäng` : "") + (r.stop ? ` (${r.stop})` : ""));
+  });
+  if (rail) { L.push("", ok ? "Inget farligt gods enligt RID." : "FULL RID GÄLLER. " + stops.join(". ")); return L.join("\n"); }
+  L.push("", `Värdeberäknad mängd: ${nf(total)} av ${nf(LIMIT)}`);
+  L.push(ok ? "OK att köra utan full ADR (1.1.3.6)." : "FÅR INTE KÖRAS UTAN FULL ADR. " + stops.join(". "));
+  return L.join("\n");
+}
+
+async function copyList() {
+  const text = summaryText();
+  try { await navigator.clipboard.writeText(text); toast("Listan är kopierad"); }
+  catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.width = "100%"; ta.rows = 8;
+    $("result").appendChild(ta); ta.focus(); ta.select();
+    toast("Markera texten och kopiera");
+  }
+}
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), 2200);
+}
+
+/* ------------------------------------------------------------ rätta rad */
+let editIdx = -1, editPg = "", editUnit = "L";
+function setSeg(id, v) { $(id).querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v))); }
+function lookup() {
+  const v = $("fUn").value.trim(), el = $("fLookup");
+  el.classList.remove("bad");
+  if (v.length < 4) { el.textContent = ""; return; }
+  const c = UN[v];
+  if (!c) { el.textContent = "Finns inte i tabellen"; el.classList.add("bad"); return; }
+  const cats = [...new Set(c.map((x) => x[0]))];
+  el.textContent = `${c[0][4]} · klass ${c[0][3]} · kategori ${cats.join("/")}${cats.length > 1 ? " (beror på förp.grp)" : ""}`;
+}
+function openSheet(i) {
+  editIdx = i;
+  const r = i >= 0 ? state.rows[i] : { un: "", pg: "", qty: null, unit: "L" };
+  $("sheetTitle").textContent = i >= 0 ? "Rätta rad" : "Lägg till rad";
+  $("fUn").value = r.un; $("fQty").value = r.qty == null ? "" : String(r.qty).replace(".", ",");
+  editPg = r.pg || ""; editUnit = r.unit || "L";
+  setSeg("fPg", editPg); setSeg("fUnit", editUnit); lookup();
+  $("fDel").hidden = i < 0;
+  $("sheetBg").hidden = false;
+  if (i < 0) setTimeout(() => $("fUn").focus(), 50);
+}
+function closeSheet() { $("sheetBg").hidden = true; }
+$("fUn").addEventListener("input", lookup);
+$("fPg").addEventListener("click", (e) => { if (e.target.dataset.v != null) { editPg = e.target.dataset.v; setSeg("fPg", editPg); } });
+$("fUnit").addEventListener("click", (e) => { if (e.target.dataset.v != null) { editUnit = e.target.dataset.v; setSeg("fUnit", editUnit); } });
+$("sheetBg").addEventListener("click", (e) => { if (e.target === $("sheetBg")) closeSheet(); });
+$("fDel").addEventListener("click", () => { state.rows.splice(editIdx, 1); closeSheet(); render(); });
+$("sheet").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const un = $("fUn").value.trim();
+  if (!/^\d{4}$/.test(un)) { $("fLookup").textContent = "Skriv fyra siffror"; $("fLookup").classList.add("bad"); return; }
+  const qv = $("fQty").value.replace(/\s/g, "").replace(",", ".");
+  const qty = qv === "" || isNaN(+qv) ? null : +qv;
+  const old = editIdx >= 0 ? state.rows[editIdx] : null;
+  const name = old && old.un === un ? old.name : (UN[un] ? UN[un][0][4] : "");
+  const row = { idType: "UN", un, name, cls: old && old.un === un ? old.cls : "", pg: editPg, qty, unit: editUnit, gross: false, warn: [] };
+  if (old) state.rows[editIdx] = row; else state.rows.push(row);
+  if (state.example) { state.example = false; state.source = "Egen inmatning"; if (!old) state.rows = [row]; }
+  closeSheet(); render();
+});
+
+/* ------------------------------------------------------------ läsa fil: PDF-text eller OCR */
+let ocrWorker = null;
+function busy(on, text, frac) {
+  $("busy").hidden = !on;
+  if (text) $("busyText").textContent = text;
+  if (frac != null) $("busyBar").style.width = Math.round(frac * 100) + "%";
+}
+async function getWorker() {
+  if (ocrWorker) return ocrWorker;
+  const opts = {
+    workerPath: base("vendor/tess/worker.min.js"),
+    corePath: base("vendor/tess/"),
+    langPath: base("vendor/tess"),
+    logger: (m) => {
+      if (m.status === "recognizing text") busy(true, "Läser av texten…", 0.3 + 0.7 * m.progress);
+      else if (/load/.test(m.status)) busy(true, "Förbereder textigenkänning…", 0.05 + 0.25 * (m.progress || 0));
+    },
+  };
+  try { ocrWorker = await Tesseract.createWorker(["swe", "eng"], 1, opts); }
+  catch (e) { ocrWorker = await Tesseract.createWorker(["swe", "eng"], 1, { ...opts, cacheMethod: "none" }); }
+  return ocrWorker;
+}
+
+async function ocrCanvas(canvas) {
+  const w = await getWorker();
+  const { data } = await w.recognize(canvas, {}, { text: true, blocks: true });
+  const lines = [];
+  (data.blocks || []).forEach((b) => (b.paragraphs || []).forEach((p) => (p.lines || []).forEach((l) => lines.push({ text: l.text.trim(), conf: l.confidence }))));
+  if (!lines.length) data.text.split("\n").forEach((t) => lines.push({ text: t, conf: data.confidence }));
+  return lines;
+}
+
+function imageToCanvas(img, maxW = 2200) {
+  const k = Math.min(1, maxW / img.width) * (img.width < 1200 ? 1800 / img.width : 1);
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+  const g = c.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+
+function loadImage(blob) {
+  return new Promise((ok, bad) => {
+    const url = URL.createObjectURL(blob), img = new Image();
+    img.onload = () => ok(img);
+    img.onerror = () => bad(new Error("Bilden kunde inte öppnas"));
+    img.src = url;
+  });
+}
+
+async function readPdf(buf) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = base("vendor/pdf.worker.min.js");
+  const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+  let lines = [], preview = null;
+  for (let p = 1; p <= Math.min(doc.numPages, 5); p++) {
+    const page = await doc.getPage(p);
+    const tc = await page.getTextContent();
+    const items = tc.items.filter((it) => it.str && it.str.trim());
+    if (p === 1 || items.length < 5) {
+      const vp0 = page.getViewport({ scale: 1 });
+      const vp = page.getViewport({ scale: 1800 / vp0.width });
+      const c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height;
+      await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+      if (p === 1) preview = c.toDataURL("image/jpeg", 0.7);
+      if (items.length < 5) { busy(true, `Läser av sida ${p}…`, 0.2); lines = lines.concat(await ocrCanvas(c)); continue; }
+    }
+    items.sort((a, b) => b.transform[5] - a.transform[5] || a.transform[4] - b.transform[4]);
+    let cur = [], y = null;
+    const flush = () => { if (cur.length) lines.push({ text: cur.sort((a, b) => a.transform[4] - b.transform[4]).map((i) => i.str).join(" "), conf: 100 }); cur = []; };
+    for (const it of items) {
+      const iy = it.transform[5], hgt = Math.abs(it.transform[3]) || 8;
+      if (y != null && Math.abs(iy - y) > hgt * 0.5) flush();
+      if (!cur.length) y = iy;
+      cur.push(it);
+    }
+    flush();
+  }
+  return { lines, preview };
+}
+
+async function handleFile(file, label) {
+  $("err").hidden = true;
+  busy(true, "Läser av fraktsedeln…", 0.02);
+  try {
+    let lines, preview;
+    const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name || "");
+    if (isPdf) ({ lines, preview } = await readPdf(await file.arrayBuffer()));
+    else {
+      const img = await loadImage(file);
+      const c = imageToCanvas(img);
+      preview = imageToCanvas(img, 1000).toDataURL("image/jpeg", 0.7);
+      lines = await ocrCanvas(c);
+    }
+    const rows = parseLines(lines);
+    const air = /SHIPPER.?S DECLARATION|DANGEROUS GOODS REGULATIONS|AIR ?WAY ?BILL|AIRPORT OF|CARGO AIRCRAFT|PASSENGER AND CARGO/i.test(lines.map((l) => l.text).join(" "));
+    state = { mode: state.mode, air, example: false, source: label || file.name || "Foto", img: preview, rows };
+    busy(false);
+    if (!rows.length) {
+      $("err").textContent = "Hittade inga UN-nummer. Fota igen rakt ovanifrån i bra ljus, eller tryck \"Skriv in själv\".";
+      $("err").hidden = false;
+    }
+    render();
+    $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    busy(false);
+    console.error(e);
+    $("err").textContent = "Det gick inte att läsa av filen (" + (e.message || e) + "). Försök igen eller skriv in raderna själv.";
+    $("err").hidden = false;
+  }
+}
+
+$("mode").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-mode]");
+  if (!b) return;
+  state.mode = b.dataset.mode;
+  try { localStorage.setItem("adr-mode", state.mode); } catch (err) {}
+  render();
+});
+$("btnPhoto").addEventListener("click", () => $("inPhoto").click());
+$("btnFile").addEventListener("click", () => $("inFile").click());
+$("btnManual").addEventListener("click", () => {
+  if (state.example) state = { mode: state.mode, air: false, example: false, source: "Egen inmatning", img: null, rows: [] };
+  render(); openSheet(-1);
+});
+["inPhoto", "inFile"].forEach((id) => $(id).addEventListener("change", (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (f) handleFile(f);
+}));
+document.querySelectorAll("[data-ex]").forEach((b) => b.addEventListener("click", async () => {
+  try {
+    busy(true, "Hämtar exemplet…", 0.01);
+    const res = await fetch(base("exempel/" + b.dataset.ex));
+    if (!res.ok) throw new Error("hittades inte");
+    const blob = await res.blob();
+    const f = new File([blob], b.dataset.ex, { type: blob.type || (b.dataset.ex.endsWith(".pdf") ? "application/pdf" : "image/png") });
+    await handleFile(f, b.textContent);
+  } catch (e) {
+    busy(false); $("err").textContent = "Exemplet kunde inte hämtas (" + e.message + ")."; $("err").hidden = false;
+  }
+}));
+
+window.ADR = { parseLines, findQuantity, calculate };
+render();
+</script>

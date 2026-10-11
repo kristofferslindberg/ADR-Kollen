@@ -187,6 +187,29 @@ details.photo img { margin-top: 8px; border-radius: 10px; border: 2px solid var(
 .btn-del { background: transparent; color: var(--stop); box-shadow: inset 0 0 0 2px var(--stop); }
 .btn-ok { background: var(--press); color: var(--press-ink); }
 .toast { position: fixed; left: 50%; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--press); color: var(--press-ink); padding: 12px 18px; border-radius: 12px; font-weight: 600; z-index: 20; }
+.section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.section-title small { color: var(--muted); font-size: .85rem; }
+.tbl-wrap { overflow-x: auto; background: var(--surface); border-radius: 14px; box-shadow: inset 0 0 0 2px var(--line); }
+.tbl { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: .95rem; }
+.tbl th, .tbl td { padding: 10px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+.tbl th:first-child, .tbl td:first-child { text-align: left; }
+.tbl thead th { font: 600 .74rem/1.2 var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.tbl td.un { font-weight: 700; }
+.tbl td.un small { display: block; font-weight: 400; color: var(--muted); font-size: .78rem; max-width: 9.5rem; white-space: normal; }
+.tbl tfoot td { border-bottom: 0; font-weight: 700; }
+.tbl tfoot tr.sum td { border-top: 2px solid var(--fg); font-size: 1.05rem; }
+.tbl tfoot tr.limit td { font-weight: 500; color: var(--muted); }
+.tbl tfoot tr.res td { color: var(--ok); }
+.tbl tfoot tr.res.stop td { color: var(--stop); }
+.paper { background: #fffdf6; color: #15191c; border-radius: 6px; padding: 16px; box-shadow: 0 1px 0 #d8d2bf, 0 6px 18px rgba(0,0,0,.12); display: grid; gap: 12px;
+  border-left: 6px solid var(--plate); }
+.paper .entry b { display: block; font-weight: 700; overflow-wrap: anywhere; }
+.paper .entry span { color: #4a5157; font-size: .92rem; }
+.paper .sumhead { font: 600 .74rem/1.2 var(--body); letter-spacing: .06em; text-transform: uppercase; color: #6a6250; border-top: 1px dashed #cfc6ad; padding-top: 10px; }
+.paper .line { display: flex; justify-content: space-between; gap: 10px; font-variant-numeric: tabular-nums; }
+.paper .line.total { font-weight: 700; }
+.paper .note-p { font-size: .88rem; color: #4a5157; margin: 0; }
+.paper-hint { color: var(--muted); font-size: .88rem; margin: -6px 0 0; }
 .sheet-bg { animation: fade .2s ease-out; }
 .sheet { animation: up .26s cubic-bezier(.2,.8,.2,1); }
 .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: -8px auto 0; }
@@ -459,7 +482,7 @@ function calcRow(r) {
   if (!cand) { out.stop = `UN ${r.un} finns inte i tabellen`; out.notes.push("Okänt UN-nummer, kontrollera siffrorna"); return out; }
   const { row: c, note } = pickVariant(cand, r);
   if (note) out.notes.push(note);
-  out.cat = c[0]; out.tableName = c[4];
+  out.cat = c[0]; out.tableName = c[4]; out.row = c;
   if (r.cls && c[3] && r.cls !== c[3] && r.cls !== labelSet(c[5])[0]) out.notes.push(`Klass ${r.cls} på papperet, ${c[3]} i tabellen`);
   if (c[2] === "0") out.stop = `UN ${r.un} är transportkategori 0`;
   else if (c[2] === "F") out.stop = `UN ${r.un} får inte transporteras enligt ADR`;
@@ -564,11 +587,16 @@ function render() {
   });
   h.push("</div>");
   h.push(`<button class="btn btn-sec" type="button" id="btnAdd">+ Lägg till rad</button>`);
+  if (calc.length) {
+    if (!rail) h.push(calcTableHtml(calc, total, ok));
+    h.push(paperHtml(calc, total, ok, rail));
+  }
   if (state.img) h.push(`<details class="photo"><summary>Visa fotot som lästes av</summary><img src="${state.img}" alt="Avläst fraktsedel"></details>`);
   document.querySelectorAll("#mode button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === state.mode)));
   $("result").innerHTML = h.join("");
   $("result").querySelectorAll(".row").forEach((b) => b.addEventListener("click", () => openSheet(+b.dataset.i)));
   $("btnAdd").addEventListener("click", () => openSheet(-1));
+  if ($("btnCopyPaper")) $("btnCopyPaper").addEventListener("click", () => copyText(paperText(calc, total, ok, rail), "Texten är kopierad"));
   renderRecent();
   saveRecent();
 }
@@ -627,6 +655,101 @@ async function shareList() {
   copyList();
 }
 
+/* ------------------------------------------------------------ uträkning och text till fraktsedeln */
+// Raden enligt ADR/RID 5.4.1.1.1: UN-nummer, benämning, klass (sekundära faror inom parentes),
+// förpackningsgrupp och tunnelkod, t.ex. "UN 1203 BENSIN, 3, II, (D/E)".
+function docLine(r) {
+  if (r.idType !== "UN") return null;
+  const c = r.row;
+  const name = (r.name || r.tableName || "").trim();
+  let cls = r.cls || "";
+  let subs = r.subs || [];
+  if (c) {
+    const labels = labelSet(c[5]);
+    cls = c[3] === "1" ? c[7] : (labels[0] || c[3]);
+    subs = labels.slice(1);
+  }
+  const pg = r.pg || (c && c[1]) || "";
+  const tunnel = c && c[6] ? `(${c[6]})` : "";
+  return [`UN ${r.un} ${name}`, cls + (subs.length ? ` (${subs.join(", ")})` : ""), pg, tunnel].filter(Boolean).join(", ");
+}
+const qtyText = (r) => (r.qty == null ? "? " + r.unit : `${nf(r.qty)} ${r.unit}${r.gross ? " brutto" : ""}`);
+
+// Summering per transportkategori enligt 1.1.3.6.3 (mängd och värdeberäknad mängd).
+function categorySums(calc) {
+  const by = {};
+  for (const r of calc) {
+    if (r.mult == null || r.qty == null) continue;
+    const g = by[r.cat] || (by[r.cat] = { cat: r.cat, mult: r.mult, L: 0, kg: 0, pts: 0 });
+    g[r.unit === "kg" ? "kg" : "L"] += r.qty; g.pts += r.pts;
+  }
+  return Object.values(by).sort((a, b) => a.cat.localeCompare(b.cat)).map((g) => ({
+    ...g, qty: [g.L && `${nf(g.L)} L`, g.kg && `${nf(g.kg)} kg`].filter(Boolean).join(" + ") || "0" }));
+}
+
+function calcTableHtml(calc, total, ok) {
+  const rows = calc.map((r) => `<tr>
+    <td class="un">${r.idType} ${esc(r.un)}<small>${esc(r.name || r.tableName || "")}</small></td>
+    <td>${r.cat === "" ? "–" : esc(r.cat)}</td>
+    <td>${esc(qtyText(r))}</td>
+    <td>${r.mult == null ? "–" : "× " + r.mult}</td>
+    <td>${r.mult == null || r.qty == null ? "–" : nf(r.pts)}</td></tr>`).join("");
+  return `<div class="section-title"><h2>Så har appen räknat</h2><small>ADR 1.1.3.6</small></div>
+  <div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>UN-nr</th><th>Kat.</th><th>Mängd</th><th>Faktor</th><th>Poäng</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot>
+      <tr class="sum"><td colspan="4">Värdeberäknad mängd</td><td>${nf(total)}</td></tr>
+      <tr class="limit"><td colspan="4">Gräns</td><td>${nf(LIMIT)}</td></tr>
+      <tr class="res ${ok ? "" : "stop"}"><td colspan="5">${ok ? "Under gränsen: OK att köra utan full ADR" : "Får inte köras utan full ADR"}</td></tr>
+    </tfoot>
+  </table></div>`;
+}
+
+function paperText(calc, total, ok, rail) {
+  const L = [];
+  for (const r of calc) {
+    const line = docLine(r);
+    if (line) L.push(line, `  ${qtyText(r)} (lägg till antal och typ av kollin)`);
+  }
+  if (!rail && ok) {
+    L.push("", "Transporten sker enligt undantaget i ADR 1.1.3.6.");
+    for (const g of categorySums(calc)) L.push(`Transportkategori ${g.cat}: ${g.qty}, värdeberäknad mängd ${nf(g.pts)}`);
+    L.push(`Värdeberäknad mängd totalt: ${nf(total)}`);
+  }
+  return L.join("\n");
+}
+
+function paperHtml(calc, total, ok, rail) {
+  const entries = calc.map((r) => {
+    const line = docLine(r);
+    return line ? `<div class="entry"><b>${esc(line)}</b><span>${esc(qtyText(r))}, plus antal och typ av kollin</span></div>` : "";
+  }).join("");
+  let sums = "";
+  if (!rail && ok) {
+    sums = `<div class="sumhead">Undantag enligt ADR 1.1.3.6</div>
+      <p class="note-p">Transporten sker enligt undantaget i ADR 1.1.3.6.</p>
+      ${categorySums(calc).map((g) => `<div class="line"><span>Transportkategori ${esc(g.cat)}: ${esc(g.qty)}</span><span>${nf(g.pts)}</span></div>`).join("")}
+      <div class="line total"><span>Värdeberäknad mängd totalt</span><span>${nf(total)}</span></div>`;
+  } else if (!rail) {
+    sums = `<div class="sumhead">Full ADR</div><p class="note-p">Undantaget gäller inte. Raderna ovan ska stå i transportdokumentet och full ADR gäller för transporten.</p>`;
+  }
+  return `<div class="section-title"><h2>Skriv så här på fraktsedeln</h2><small>${rail ? "RID" : "ADR"} 5.4.1.1.1</small></div>
+    <p class="paper-hint">Kontrollera mot fraktsedeln. Benämningen ska vara den officiella, så som avsändaren skrivit den.</p>
+    <div class="paper">${entries}${sums}</div>
+    <button class="btn btn-sec" type="button" id="btnCopyPaper">Kopiera texten</button>`;
+}
+
+async function copyText(text, msg) {
+  try { await navigator.clipboard.writeText(text); toast(msg); }
+  catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.width = "100%"; ta.rows = 8;
+    $("result").appendChild(ta); ta.focus(); ta.select();
+    toast("Markera texten och kopiera");
+  }
+}
+
 function summaryText() {
   const { calc, total, ok, stops } = calculate(state.rows);
   const rail = state.mode === "jarnvag";
@@ -636,9 +759,10 @@ function summaryText() {
     L.push(`${r.idType} ${r.un} ${r.name || r.tableName}${r.pg ? ", förp.grp " + r.pg : ""}: ${q}` +
       (!rail && r.mult != null && r.qty != null ? ` × ${r.mult} = ${nf(r.pts)} poäng` : "") + (r.stop ? ` (${r.stop})` : ""));
   });
-  if (rail) { L.push("", ok ? "Inget farligt gods enligt RID." : "FULL RID GÄLLER. " + stops.join(". ")); return L.join("\n"); }
+  if (rail) { L.push("", ok ? "Inget farligt gods enligt RID." : "FULL RID GÄLLER. " + stops.join(". "), "", "Skriv så här på fraktsedeln:", paperText(calc, total, ok, rail)); return L.join("\n"); }
   L.push("", `Värdeberäknad mängd: ${nf(total)} av ${nf(LIMIT)}`);
   L.push(ok ? "OK att köra utan full ADR (1.1.3.6)." : "FÅR INTE KÖRAS UTAN FULL ADR. " + stops.join(". "));
+  L.push("", "Skriv så här på fraktsedeln:", paperText(calc, total, ok, rail));
   return L.join("\n");
 }
 

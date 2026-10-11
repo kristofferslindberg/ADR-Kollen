@@ -1,9 +1,10 @@
-<!doctype html><html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#F28C00"><link rel="apple-touch-icon" href="icon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style></head><body><title>ADR-kollen</title>
+<!doctype html><html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#15191c"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="ADR-kollen"><meta name="format-detection" content="telephone=no"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png"><link rel="apple-touch-startup-image" href="icons/splash-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"><link rel="apple-touch-startup-image" href="icons/splash-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"><link rel="apple-touch-startup-image" href="icons/splash-1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"><link rel="apple-touch-startup-image" href="icons/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"><link rel="apple-touch-startup-image" href="icons/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"><link rel="apple-touch-startup-image" href="icons/splash-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"><link rel="apple-touch-startup-image" href="icons/splash-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"><link rel="apple-touch-startup-image" href="icons/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"><link rel="apple-touch-startup-image" href="icons/splash-1080x2340.png" media="(device-width: 360px) and (device-height: 780px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"><style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style></head><body><title>ADR-kollen</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
 <style>
-/* Layout: en kolumn för telefonen. Stora knappar överst, beslutet som en hel färgad skylt, sedan raderna som ADR-skyltar. */
+/* Layout: app med två vyer (Start och Resultat). Mörkt toppfält, innehåll som rullar, och en fast knapprad
+   nere vid tummen. Beslutet visas som en hel färgad skylt och raderna som ADR-skyltar. */
 :root {
   --bg: #eef0ee;
   --surface: #ffffff;
@@ -20,6 +21,9 @@
   --warn-bg: #fff3d6;
   --press: #15191c;
   --press-ink: #ffffff;
+  --bar: #15191c;            /* toppfält och statusrad */
+  --bar-ink: #eef1f2;
+  --dock: rgba(238,240,238,.92);
   --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --body: "Barlow", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
@@ -27,21 +31,68 @@
   :root:not([data-theme="light"]) {
     --bg: #101315; --surface: #1a1f22; --fg: #eef1f2; --muted: #9ba5ac; --line: #2c3337;
     --ok: #2f9a55; --stop: #d8352b; --warn: #f2c25b; --warn-bg: #3a2e12;
-    --press: #eef1f2; --press-ink: #101315; color-scheme: dark;
+    --press: #eef1f2; --press-ink: #101315; --bar: #0b0d0e; --dock: rgba(16,19,21,.92); color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #101315; --surface: #1a1f22; --fg: #eef1f2; --muted: #9ba5ac; --line: #2c3337;
   --ok: #2f9a55; --stop: #d8352b; --warn: #f2c25b; --warn-bg: #3a2e12;
-  --press: #eef1f2; --press-ink: #101315; color-scheme: dark;
+  --press: #eef1f2; --press-ink: #101315; --bar: #0b0d0e; --dock: rgba(16,19,21,.92); color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body { background: var(--bg); color: var(--fg); font: 17px/1.45 var(--body); }
-.wrap { max-width: 34rem; margin: 0 auto; padding-inline: 16px; padding-block: 14px 48px; display: flex; flex-direction: column; gap: 18px; }
-header.top { display: flex; align-items: center; gap: 12px; }
-.logo { width: 46px; height: 34px; background: var(--plate); border: 3px solid var(--plate-ink); border-radius: 3px; display: grid; place-items: center; font: 700 15px/1 var(--display); color: var(--plate-ink); letter-spacing: .04em; flex: none; }
-h1 { font: 700 1.7rem/1 var(--display); margin: 0; letter-spacing: .01em; }
-.sub { color: var(--muted); font-size: .9rem; margin: 2px 0 0; }
+/* Toppfältet och knappraden tar själva hand om skårans och hemindikatorns marginaler. */
+:root { padding-top: 0 !important; padding-bottom: 0 !important; }
+body { background: var(--bg); color: var(--fg); font: 17px/1.45 var(--body); overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+button, .appbar, .dock, .plate, .verdict .big { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+button { touch-action: manipulation; }
+
+.appbar { position: sticky; top: 0; z-index: 5; background: var(--bar); color: var(--bar-ink);
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; }
+.appbar .mid-title { display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 0; }
+.appbar h1 { font: 700 1.45rem/1 var(--display); margin: 0; letter-spacing: .02em; white-space: nowrap; }
+.icon-btn { appearance: none; border: 0; background: transparent; color: inherit; width: 44px; height: 44px; border-radius: 22px; display: grid; place-items: center; cursor: pointer; }
+.icon-btn svg { width: 26px; height: 26px; }
+.icon-btn:active { background: rgba(255,255,255,.12); }
+.logo { width: 40px; height: 28px; background: var(--plate); border: 3px solid var(--plate-ink); border-radius: 3px; display: grid; place-items: center; font: 700 13px/1 var(--display); color: var(--plate-ink); letter-spacing: .04em; flex: none; }
+
+.screen { max-width: 34rem; margin: 0 auto; padding-inline: 16px; padding-block: 16px calc(env(safe-area-inset-bottom, 0px) + 170px);
+  display: flex; flex-direction: column; gap: 16px; animation: enter .28s ease-out; }
+.screen.result { padding-block: 16px calc(env(safe-area-inset-bottom, 0px) + 120px); }
+.screen.back { animation-name: enter-back; }
+@keyframes enter { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes enter-back { from { transform: translateX(-28px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.hero { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
+.hero .big-plate { width: 92px; }
+.hero .big-plate b { font-size: 1.7rem; }
+.hero p { margin: 0; font-size: 1.02rem; }
+.hero strong { display: block; font: 700 1.5rem/1.05 var(--display); text-transform: uppercase; letter-spacing: .01em; margin-bottom: 4px; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; counter-reset: s; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; color: var(--muted); font-size: .9rem; line-height: 1.35; }
+.steps li::before { content: counter(s); width: 26px; height: 26px; border-radius: 13px; background: var(--surface); box-shadow: inset 0 0 0 2px var(--line); color: var(--fg);
+  display: grid; place-items: center; font: 700 .9rem/1 var(--display); }
+.recent-label { font: 600 .78rem/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 6px 0 -6px; }
+.recent { appearance: none; border: 0; width: 100%; text-align: left; font: inherit; color: var(--fg); cursor: pointer;
+  background: var(--surface); border-radius: 16px; box-shadow: inset 0 0 0 2px var(--line); padding: 14px; display: grid; grid-template-columns: 10px 1fr auto; gap: 12px; align-items: center; }
+.recent .stripe { align-self: stretch; border-radius: 5px; background: var(--ok); }
+.recent.stop .stripe { background: var(--stop); }
+.recent .r-title { font-weight: 600; overflow-wrap: anywhere; }
+.recent .r-sub { color: var(--muted); font-size: .88rem; }
+.recent .r-pts { font: 700 1.4rem/1 var(--display); font-variant-numeric: tabular-nums; text-align: right; }
+.recent .r-pts small { display: block; font: 500 .72rem/1.2 var(--body); color: var(--muted); }
+.recent svg { width: 20px; height: 20px; color: var(--muted); }
+
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--dock); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border-top: 1px solid var(--line); padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px); }
+.dock-inner { max-width: 34rem; margin: 0 auto; display: grid; gap: 8px; }
+.dock .btn-main { padding: 18px 20px; }
+.dock .btn-row .btn { padding: 12px 10px; }
+
+.install { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; background: var(--surface); box-shadow: inset 0 0 0 2px var(--plate); border-radius: 14px; padding: 12px 14px; font-size: .92rem; }
+.install b { display: block; font-size: 1rem; }
+.install .share { display: inline-block; width: 18px; height: 18px; vertical-align: -3px; }
+.install .btn { width: auto; padding: 10px 14px; font-size: .95rem; }
 
 .actions { display: grid; gap: 10px; }
 .mode { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--surface); padding: 5px; border-radius: 14px; box-shadow: inset 0 0 0 2px var(--line); }
@@ -56,10 +107,19 @@ h1 { font: 700 1.7rem/1 var(--display); margin: 0; letter-spacing: .01em; }
 .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .btn-row .btn { font-size: 1rem; padding: 14px 10px; }
 .btn:focus-visible, .row:focus-visible, .chip:focus-visible, input:focus-visible { outline: 3px solid var(--plate); outline-offset: 2px; }
-.btn:active { transform: scale(.985); }
+.btn:active, .row:active, .recent:active { transform: scale(.98); }
+.btn, .row, .recent { transition: transform .12s ease; }
 
-.busy { background: var(--surface); border-radius: 14px; padding: 18px; display: grid; gap: 10px; box-shadow: inset 0 0 0 2px var(--line); }
-.busy b { font-size: 1.1rem; }
+.busy { position: fixed; inset: 0; z-index: 30; background: var(--bar); color: var(--bar-ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 24px calc(env(safe-area-inset-bottom, 0px) + 24px); text-align: center; }
+.busy b { font: 700 1.4rem/1.1 var(--display); text-transform: uppercase; letter-spacing: .02em; }
+.scanbox { position: relative; width: min(70vw, 280px); aspect-ratio: 3 / 4; max-width: 100%; border-radius: 12px; overflow: hidden; background: #22282c; box-shadow: 0 0 0 3px var(--plate); }
+.scanbox img { width: 100%; height: 100%; object-fit: contain; opacity: .9; }
+.scanbox::after { content: ""; position: absolute; left: 0; right: 0; height: 26%; top: -26%;
+  background: linear-gradient(to bottom, rgba(242,140,0,0), rgba(242,140,0,.45) 85%, rgba(242,140,0,.95)); animation: scan 1.6s ease-in-out infinite; }
+@keyframes scan { from { top: -26%; } to { top: 100%; } }
+.busy .bar { width: min(70vw, 280px); background: rgba(255,255,255,.18); }
+.busy .hint { color: rgba(238,241,242,.75); margin: 0; }
 .bar { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
 .bar i { display: block; height: 100%; width: 0; background: var(--plate); transition: width .3s; }
 .err { background: var(--warn-bg); color: var(--fg); border-radius: 12px; padding: 14px 16px; }
@@ -108,7 +168,7 @@ details.photo summary { cursor: pointer; color: var(--muted); font-size: .92rem;
 details.photo img { margin-top: 8px; border-radius: 10px; border: 2px solid var(--line); }
 
 .sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
-.sheet { background: var(--surface); color: var(--fg); width: 100%; max-width: 34rem; border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; max-height: 92%; overflow-y: auto; }
+.sheet { background: var(--surface); color: var(--fg); width: 100%; max-width: 34rem; border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; max-height: 92%; overflow-y: auto; overscroll-behavior: contain; }
 .sheet h3 { font: 700 1.5rem/1 var(--display); margin: 0; text-transform: uppercase; }
 .field { display: grid; gap: 6px; }
 .field label, .field .lbl { font-weight: 600; font-size: .95rem; }
@@ -126,68 +186,99 @@ details.photo img { margin-top: 8px; border-radius: 10px; border: 2px solid var(
 .sheet .btn-row .btn { font-size: 1.05rem; }
 .btn-del { background: transparent; color: var(--stop); box-shadow: inset 0 0 0 2px var(--stop); }
 .btn-ok { background: var(--press); color: var(--press-ink); }
-.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--press); color: var(--press-ink); padding: 12px 18px; border-radius: 12px; font-weight: 600; z-index: 20; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.toast { position: fixed; left: 50%; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--press); color: var(--press-ink); padding: 12px 18px; border-radius: 12px; font-weight: 600; z-index: 20; }
+.sheet-bg { animation: fade .2s ease-out; }
+.sheet { animation: up .26s cubic-bezier(.2,.8,.2,1); }
+.grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: -8px auto 0; }
+@keyframes fade { from { opacity: 0; } }
+@keyframes up { from { transform: translateY(40px); opacity: .4; } }
+.info p { margin: 0; color: var(--muted); font-size: .95rem; }
+.info p b { color: var(--fg); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 
-<div class="wrap">
-  <header class="top">
-    <div class="logo" aria-hidden="true">ADR</div>
-    <div>
-      <h1>ADR-kollen</h1>
-      <p class="sub">Farligt gods på väg och järnväg. Fota fraktsedeln.</p>
-    </div>
-  </header>
+<header class="appbar">
+  <button class="icon-btn" id="btnBack" type="button" aria-label="Tillbaka" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <span id="backSpacer"></span>
+  <div class="mid-title"><div class="logo" aria-hidden="true">ADR</div><h1 id="appTitle">ADR-kollen</h1></div>
+  <button class="icon-btn" id="btnInfo" type="button" aria-label="Om appen och reglerna"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".6" fill="currentColor"/></svg></button>
+</header>
+
+<main class="screen" id="home">
+  <div class="install" id="install" hidden>
+    <div id="installText"></div>
+    <button class="btn btn-ok" id="btnInstall" type="button" hidden>Installera</button>
+  </div>
 
   <div class="mode" id="mode" role="group" aria-label="Transportsätt">
     <button type="button" data-mode="vag">Väg<small>ADR</small></button>
     <button type="button" data-mode="jarnvag">Järnväg<small>RID</small></button>
   </div>
 
-  <section class="actions" aria-label="Läs av">
-    <button class="btn btn-main" id="btnPhoto" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>
-      Fota fraktsedeln
-    </button>
-    <div class="btn-row">
-      <button class="btn btn-sec" id="btnFile" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/></svg>
-        Välj PDF / bild
-      </button>
-      <button class="btn btn-sec" id="btnManual" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>
-        Skriv in själv
-      </button>
-    </div>
-    <input type="file" id="inPhoto" accept="image/*" capture="environment" hidden>
-    <input type="file" id="inFile" accept="image/*,application/pdf,.pdf" hidden>
-  </section>
-
-  <section class="busy" id="busy" hidden aria-live="polite">
-    <b id="busyText">Läser av fraktsedeln…</b>
-    <div class="bar"><i id="busyBar"></i></div>
-    <span class="hint" id="busyHint">Första gången tar det lite längre tid.</span>
+  <section class="hero">
+    <div class="plate big-plate" aria-hidden="true"><small>UN</small><b>1203</b></div>
+    <p><strong>Får lasten köras?</strong>Fota fraktsedeln så läser appen av UN-nummer och mängd och räknar ut svaret.</p>
   </section>
   <div class="err" id="err" hidden role="alert"></div>
+  <p class="recent-label" id="recentLabel">Senaste avläsning</p>
+  <div id="recent"></div>
+  <ol class="steps" aria-label="Så gör du">
+    <li>Fota fraktsedeln rakt ovanifrån, stående eller liggande.</li>
+    <li>Titta igenom raderna. Gulmarkerade rader trycker du på och rättar.</li>
+    <li>Grönt betyder OK att köra, rött betyder full ADR.</li>
+  </ol>
+</main>
 
-  <main id="result" aria-live="polite"></main>
+<main class="screen result" id="resultScreen" hidden>
+  <div id="result" style="display:grid;gap:14px"></div>
+</main>
 
-  <footer class="foot">
+<nav class="dock" id="dockHome" aria-label="Läs av">
+  <div class="dock-inner">
+    <button class="btn btn-main" id="btnPhoto" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Fota fraktsedeln</button>
+    <div class="btn-row">
+      <button class="btn btn-sec" id="btnFile" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/></svg>PDF / bild</button>
+      <button class="btn btn-sec" id="btnManual" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Skriv in</button>
+    </div>
+  </div>
+</nav>
+<nav class="dock" id="dockResult" aria-label="Åtgärder" hidden>
+  <div class="dock-inner btn-row">
+    <button class="btn btn-sec" id="btnShare" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6"/></svg>Dela</button>
+    <button class="btn btn-main" id="btnAgain" type="button" style="padding:14px 10px;font-size:1.05rem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Ny avläsning</button>
+  </div>
+</nav>
+<input type="file" id="inPhoto" accept="image/*" capture="environment" hidden>
+<input type="file" id="inFile" accept="image/*,application/pdf,.pdf" hidden>
+
+<section class="busy" id="busy" hidden aria-live="polite">
+  <div class="scanbox"><img id="scanImg" alt=""></div>
+  <b id="busyText">Läser av fraktsedeln…</b>
+  <div class="bar"><i id="busyBar"></i></div>
+  <p class="hint" id="busyHint">Första gången tar det lite längre tid.</p>
+</section>
+
+<div class="sheet-bg" id="infoBg" hidden>
+  <div class="sheet info" role="dialog" aria-labelledby="infoTitle">
+    <div class="grab"></div>
+    <h3 id="infoTitle">Så fungerar det</h3>
     <p>Appen gäller bara väg (ADR) och järnväg (RID). Flygdokument (IATA) och ID-nummer godtas inte.</p>
     <p><b>Väg, så räknas det (ADR 1.1.3.6):</b> mängd × faktor för varje rad. Transportkategori 1 = ×50, 2 = ×3, 3 = ×1, 4 = ×0. Summan får vara högst 1 000. Kategori 0 får aldrig köras utan full ADR.</p>
     <p>Mängd är liter för vätskor och kg för fasta ämnen (bruttovikt för föremål). Tryck på en rad för att rätta den om något blivit fel avläst.</p>
     <p><b>Järnväg:</b> poängundantaget finns bara i ADR. På järnväg gäller RID fullt ut för allt farligt gods, så där visas listan utan poäng.</p>
-    <p>Version 2026-10-10 18:42.</p>
-    <p>Hjälpmedel. Tabellen bygger på ADR 2019 Tabell A med tillägg upp till 2025. Fraktsedeln och ADR-reglerna gäller vid tvekan.</p>
+    <p>Hjälpmedel. Tabellen bygger på ADR 2019 Tabell A, kontrollerad och kompletterad upp till 2025. Fraktsedeln och ADR-reglerna gäller vid tvekan.</p>
     <div class="examples" aria-label="Prova med exempel">
-      <button class="chip" type="button" data-ex="godsdeklaration_adr_exempel.pdf">Exempel: godsdeklaration (PDF)</button>
-      <button class="chip" type="button" data-ex="adr_syntetisk.png">Exempel: fraktsedel (foto)</button>
+      <button class="chip" type="button" data-ex="godsdeklaration_adr_exempel.pdf">Prova: godsdeklaration (PDF)</button>
+      <button class="chip" type="button" data-ex="adr_syntetisk.png">Prova: fraktsedel (foto)</button>
     </div>
-  </footer>
+    <p>Version 2026-10-11 15:07</p>
+    <button class="btn btn-ok" type="button" id="infoClose">Stäng</button>
+  </div>
 </div>
 
 <div class="sheet-bg" id="sheetBg" hidden>
   <form class="sheet" id="sheet" autocomplete="off">
+    <div class="grab"></div>
     <h3 id="sheetTitle">Rätta rad</h3>
     <div class="field">
       <label for="fUn">UN-nummer</label>
@@ -472,18 +563,68 @@ function render() {
     </button>`);
   });
   h.push("</div>");
-  h.push(`<div class="btn-row">
-    <button class="btn btn-sec" type="button" id="btnAdd">+ Lägg till rad</button>
-    <button class="btn btn-sec" type="button" id="btnCopy">Kopiera listan</button>
-  </div>`);
+  h.push(`<button class="btn btn-sec" type="button" id="btnAdd">+ Lägg till rad</button>`);
   if (state.img) h.push(`<details class="photo"><summary>Visa fotot som lästes av</summary><img src="${state.img}" alt="Avläst fraktsedel"></details>`);
   document.querySelectorAll("#mode button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === state.mode)));
   $("result").innerHTML = h.join("");
-  $("result").style.display = "grid";
-  $("result").style.gap = "14px";
   $("result").querySelectorAll(".row").forEach((b) => b.addEventListener("click", () => openSheet(+b.dataset.i)));
   $("btnAdd").addEventListener("click", () => openSheet(-1));
-  $("btnCopy").addEventListener("click", copyList);
+  renderRecent();
+  saveRecent();
+}
+
+/* ------------------------------------------------------------ vyer, senaste avläsning, delning */
+const CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
+function haptic(pattern) { try { navigator.vibrate && navigator.vibrate(pattern); } catch (e) {} }
+
+function showScreen(name, opts = {}) {
+  const res = name === "result";
+  $("home").hidden = res; $("resultScreen").hidden = !res;
+  $("dockHome").hidden = res; $("dockResult").hidden = !res;
+  $("btnBack").hidden = !res; $("backSpacer").hidden = res;
+  $("appTitle").textContent = res ? "Resultat" : "ADR-kollen";
+  const el = res ? $("resultScreen") : $("home");
+  el.classList.toggle("back", !!opts.back);
+  el.style.animation = "none"; void el.offsetWidth; el.style.animation = "";
+  window.scrollTo(0, 0);
+  if (res && !opts.fromHistory) { try { history.pushState({ screen: "result" }, ""); } catch (e) {} }
+}
+window.addEventListener("popstate", () => { if (!$("resultScreen").hidden) showScreen("home", { back: true, fromHistory: true }); });
+$("btnBack").addEventListener("click", () => {
+  if (history.state && history.state.screen === "result") history.back();
+  else showScreen("home", { back: true });
+});
+
+function renderRecent() {
+  const { total, ok } = calculate(state.rows);
+  const rail = state.mode === "jarnvag";
+  const verdict = rail ? (ok ? "Inget farligt gods" : "Full RID gäller") : (ok ? "OK att köra" : "Får inte köras utan full ADR");
+  $("recentLabel").textContent = state.example ? "Exempel, inte din last" : "Senaste avläsning";
+  $("recent").innerHTML = `<button class="recent ${ok ? "ok" : "stop"}" type="button" id="btnRecent">
+    <span class="stripe"></span>
+    <span><span class="r-title">${esc(verdict)}</span><br><span class="r-sub">${esc(state.source)} · ${state.rows.length} ${state.rows.length === 1 ? "rad" : "rader"}</span></span>
+    <span class="r-pts">${rail ? CHEVRON : `${nf(total)}<small>poäng</small>`}</span>
+  </button>`;
+  $("btnRecent").addEventListener("click", () => showScreen("result"));
+}
+function saveRecent() {
+  if (state.example) return;
+  try { localStorage.setItem("adr-recent", JSON.stringify({ source: state.source, rows: state.rows, air: state.air })); } catch (e) {}
+}
+function loadRecent() {
+  try {
+    const r = JSON.parse(localStorage.getItem("adr-recent") || "null");
+    if (r && Array.isArray(r.rows)) state = { ...state, example: false, source: r.source, rows: r.rows, air: !!r.air, img: null };
+  } catch (e) {}
+}
+
+async function shareList() {
+  const text = summaryText();
+  if (navigator.share) {
+    try { await navigator.share({ title: "ADR-kollen", text }); return; }
+    catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  copyList();
 }
 
 function summaryText() {
@@ -580,6 +721,7 @@ $("sheet").addEventListener("submit", (e) => {
 let ocrWorker = null;
 function busy(on, text, frac) {
   $("busy").hidden = !on;
+  if (!on) $("scanImg").removeAttribute("src");
   if (text) $("busyText").textContent = text;
   if (frac != null) $("busyBar").style.width = Math.round(frac * 100) + "%";
 }
@@ -738,6 +880,7 @@ async function readPdf(buf) {
 async function handleFile(file, label) {
   $("err").hidden = true;
   busy(true, "Läser av fraktsedeln…", 0.02);
+  if (!/pdf/.test(file.type)) $("scanImg").src = URL.createObjectURL(file);
   try {
     let lines, preview;
     const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name || "");
@@ -757,11 +900,15 @@ async function handleFile(file, label) {
     state = { mode: state.mode, air, example: false, source: label || file.name || "Foto", img: preview, rows };
     busy(false);
     if (!rows.length) {
-      $("err").textContent = "Hittade inga UN-nummer. Fota igen rakt ovanifrån i bra ljus, eller tryck \"Skriv in själv\".";
+      $("err").textContent = "Hittade inga UN-nummer. Fota igen rakt ovanifrån i bra ljus, eller tryck \"Skriv in\".";
       $("err").hidden = false;
+      haptic([60, 80, 60]);
+      render();
+      return;
     }
     render();
-    $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+    showScreen("result");
+    haptic(calculate(state.rows).ok ? 40 : [90, 70, 90]);
   } catch (e) {
     busy(false);
     console.error(e);
@@ -780,14 +927,20 @@ $("mode").addEventListener("click", (e) => {
 $("btnPhoto").addEventListener("click", () => $("inPhoto").click());
 $("btnFile").addEventListener("click", () => $("inFile").click());
 $("btnManual").addEventListener("click", () => {
-  if (state.example) state = { mode: state.mode, air: false, example: false, source: "Egen inmatning", img: null, rows: [] };
-  render(); openSheet(-1);
+  state = { mode: state.mode, air: false, example: false, source: "Egen inmatning", img: null, rows: [] };
+  render(); showScreen("result"); openSheet(-1);
 });
+$("btnAgain").addEventListener("click", () => $("inPhoto").click());
+$("btnShare").addEventListener("click", shareList);
+$("btnInfo").addEventListener("click", () => { $("infoBg").hidden = false; });
+$("infoClose").addEventListener("click", () => { $("infoBg").hidden = true; });
+$("infoBg").addEventListener("click", (e) => { if (e.target === $("infoBg")) $("infoBg").hidden = true; });
 ["inPhoto", "inFile"].forEach((id) => $(id).addEventListener("change", (e) => {
   const f = e.target.files[0]; e.target.value = "";
   if (f) handleFile(f);
 }));
 document.querySelectorAll("[data-ex]").forEach((b) => b.addEventListener("click", async () => {
+  $("infoBg").hidden = true;
   try {
     busy(true, "Hämtar exemplet…", 0.01);
     const res = await fetch(base("exempel/" + b.dataset.ex));
@@ -800,7 +953,32 @@ document.querySelectorAll("[data-ex]").forEach((b) => b.addEventListener("click"
   }
 }));
 
+/* ------------------------------------------------------------ installera på hemskärmen */
+(function installHint() {
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  let framed = true; try { framed = window.self !== window.top; } catch (e) {}
+  if (standalone || framed) return;
+  const SHARE_ICON = '<svg class="share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Dela"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6"/></svg>';
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
+    $("installText").innerHTML = `<b>Lägg appen på hemskärmen</b>Tryck på ${SHARE_ICON} i Safari och välj Lägg till på hemskärmen.`;
+    $("install").hidden = false;
+  }
+  let deferred = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault(); deferred = e;
+    $("installText").innerHTML = "<b>Installera ADR-kollen</b>Då får du en egen ikon och appen fungerar utan täckning.";
+    $("btnInstall").hidden = false; $("install").hidden = false;
+  });
+  $("btnInstall").addEventListener("click", async () => {
+    if (!deferred) return;
+    deferred.prompt(); try { await deferred.userChoice; } catch (e) {}
+    deferred = null; $("install").hidden = true;
+  });
+  window.addEventListener("appinstalled", () => { $("install").hidden = true; });
+})();
+
 window.ADR = { parseLines, findQuantity, calculate };
+loadRecent();
 render();
 </script>
 <script>if('serviceWorker' in navigator){let r=!navigator.serviceWorker.controller;navigator.serviceWorker.register('sw.js');navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!r){r=1;location.reload()}})}</script></body></html>

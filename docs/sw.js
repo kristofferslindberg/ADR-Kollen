@@ -1,12 +1,12 @@
 // Cachar appen så att den fungerar utan täckning. Sidan hämtas från nätet först (så att nya
 // versioner kommer fram direkt), de stora OCR-filerna ligger i en egen cache som behålls mellan versioner.
-const APP = "adr-kollen-app-v3";
+const APP = "adr-kollen-app-v4";
 const VENDOR = "adr-kollen-vendor-v1";   // byt bara när filerna i vendor/ ändras
 const VENDOR_FILES = ["vendor/pdf.min.js", "vendor/pdf.worker.min.js", "vendor/tess/tesseract.min.js",
   "vendor/tess/worker.min.js", "vendor/tess/tesseract-core-simd-lstm.wasm.js", "vendor/tess/tesseract-core-lstm.wasm.js",
   "vendor/tess/swe.traineddata.gz", "vendor/tess/eng.traineddata.gz"];
 self.addEventListener("install", (e) => e.waitUntil(Promise.all([
-  caches.open(APP).then((c) => c.addAll(["./", "manifest.webmanifest", "icon.svg"])),
+  caches.open(APP).then((c) => c.addAll(["./", "manifest.webmanifest", "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png"])),
   caches.open(VENDOR).then(async (c) => { for (const f of VENDOR_FILES) if (!(await c.match(f))) await c.add(f); }),
 ]).then(() => self.skipWaiting())));
 self.addEventListener("activate", (e) => e.waitUntil(caches.keys()

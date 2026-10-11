@@ -16,6 +16,8 @@ Demo (Artifact): https://claude.ai/artifact/XQPQ5Hw8xPBMuUx9VGJKyV
   transport förbjuden, okänt UN-nummer, oläslig mängd. Saknas förpackningsgrupp används strängaste kategorin.
 
 ## Filer
+- `tools/make_icons.py` ritar appikoner och iPhone-startskärmar till `docs/icons/`.
+- `docs/manifest.webmanifest` och `docs/sw.js` gör appen installerbar och gör att den fungerar utan täckning.
 - `src/app.html` källkod, `data/adr_tabell_a.csv` UN-tabellen.
 - `python3 build.py` bygger `docs/`: den installerbara appen (manifest + service worker, fungerar utan täckning efter första start).
 - `docs/` publiceras med GitHub Pages (Settings > Pages > Deploy from branch > main /docs). Öppna adressen på telefonen och välj "Lägg till på hemskärmen".

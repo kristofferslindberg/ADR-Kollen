@@ -322,6 +322,10 @@ details.photo img { margin-top: 8px; border-radius: 10px; border: 2px solid var(
       </div>
     </div>
     <div class="field">
+      <label for="fPkg">Antal och typ av kollin</label>
+      <input id="fPkg" placeholder="t.ex. 4 fat" style="font-size:1.15rem">
+    </div>
+    <div class="field">
       <label for="fQty">Mängd</label>
       <div class="qty">
         <input id="fQty" inputmode="decimal" placeholder="t.ex. 200">
@@ -385,6 +389,19 @@ function findQuantity(text) {
   return null;
 }
 
+// Antal och typ av kollin, t.ex. "4 st plåtfat", "1 pall (20 hinkar)", "10 kartonger".
+const PKG_WORDS = "(?:plåt|stål|plast)?(?:fat|fatet|faten|dunk(?:ar)?|kanister|kanistrar|jerrycan(?:s)?|kartong(?:er)?|låda|lådor|pall(?:ar)?|hink(?:ar)?|" +
+  "IBC|IBC:?er|flask(?:a|or)|säck(?:ar)?|kolli|kollin|burk(?:ar)?|behållare|cylind(?:er|rar)|gasflask(?:a|or)|tank(?:ar)?|paket|box(?:ar)?|rull(?:ar)?|bunt(?:ar)?|drums?|boxes|box|cans?|bags?|pallets?)";
+const PKG_RE = new RegExp("\\b(\\d+)\\s*(?:st\\.?|x|×)?\\s*(" + PKG_WORDS + ")\\b(\\s*\\([^)]{1,30}\\))?", "i");
+function findPackages(prefix, rest) {
+  // Före UN-numret står ofta "4 st plåtfat" (tabellens första kolumn). Där godtas vilket ord som helst.
+  const pre = prefix.replace(/[|]/g, " ").trim();
+  const m1 = pre.match(/(\d+)[.,]?\s*(?:st\.?\s+|x\s*|×\s*)?(\p{L}[\p{L}\-]{1,24})(\s*\([^)]{1,30}\))?\s*$/u);
+  if (m1) return `${m1[1]} ${m1[2]}${m1[3] || ""}`.replace(/\s+/g, " ").trim();
+  const m2 = rest.match(PKG_RE);
+  return m2 ? m2[0].replace(/\s+/g, " ").trim() : "";
+}
+
 function parseLines(lines) {
   const rows = [];
   for (let i = 0; i < lines.length; i++) {
@@ -414,7 +431,8 @@ function parseLines(lines) {
     const subs = [];
     for (const pm of head.matchAll(/\(\s*([1-9](?:\.[1-9])?(?:\s*[,+]\s*[1-9](?:\.[1-9])?)*)\s*\)/g)) subs.push(...pm[1].split(/\s*[,+]\s*/));
     const tunM = head.match(/\(\s*([A-E](?:\d{4})?[A-E]?(?:\/[A-E])?|-)\s*\)/);
-    rows.push({ idType, un, name, desc: head, subs, tunnel: tunM ? tunM[1] : "", cls: clsM ? clsM[1] : "", pg: pgM ? "I".repeat(pgM[1].length) : "",
+    const pkg = findPackages(ln.slice(0, m.index), rest);
+    rows.push({ idType, un, name, desc: head, pkg, subs, tunnel: tunM ? tunM[1] : "", cls: clsM ? clsM[1] : "", pg: pgM ? "I".repeat(pgM[1].length) : "",
                 qty: q ? q.qty : null, unit: q ? q.unit : "L", gross: q ? q.gross : false, warn });
   }
   // UN-nummer som bara nämns i löptext (t.ex. "kollin med UN 3107 ska skyddas...") och redan finns
@@ -465,6 +483,9 @@ function pickVariant(cand, r) {
     narrow((c) => /MOLTEN/.test(c[4]) === molten);
   }
   if (distinctCats(rows) > 1 && r.tunnel) narrow((c) => c[6] === r.tunnel);
+  // Samma kategori men olika tunnelkod (t.ex. viskös färg): välj raden som stämmer med papperet,
+  // så att texten till fraktsedeln får rätt tunnelkod.
+  if (r.tunnel) { const t = rows.filter((c) => c[6] === r.tunnel); if (t.length) rows = t; }
   const row = rows.reduce((a, b) => (catNum(b) < catNum(a) ? b : a));
   let note = pgNote;
   if (distinctCats(rows) > 1) {
@@ -522,8 +543,8 @@ let state = {
   source: "Exempel: godsdeklaration (PDF)",
   img: null,
   rows: [
-    { idType: "UN", un: "1203", name: "BENSIN", cls: "3", pg: "II", qty: 800, unit: "L", gross: false, warn: [] },
-    { idType: "UN", un: "1263", name: "FÄRG", cls: "3", pg: "III", qty: 200, unit: "L", gross: false, warn: [] },
+    { idType: "UN", un: "1203", name: "BENSIN", pkg: "4 plåtfat", tunnel: "D/E", cls: "3", pg: "II", qty: 800, unit: "L", gross: false, warn: [] },
+    { idType: "UN", un: "1263", name: "FÄRG", pkg: "1 pall (20 hinkar)", tunnel: "E", cls: "3", pg: "III", qty: 200, unit: "L", gross: false, warn: [] },
   ],
 };
 
@@ -571,7 +592,7 @@ function render() {
   calc.forEach((r, i) => {
     const cls = r.stop ? "bad" : r.notes.length ? "warn" : "";
     const qty = r.qty == null ? "? " + r.unit : `${nf(r.qty)} ${r.unit}${r.gross ? " brutto" : ""}`;
-    const facts = [r.cls && `Klass ${r.cls}`, r.pg && `Förp.grp ${r.pg}`, !rail && r.cat !== "" && `Kategori ${r.cat}`].filter(Boolean).join(" · ");
+    const facts = [r.pkg, r.cls && `Klass ${r.cls}`, r.pg && `Förp.grp ${r.pg}`, !rail && r.cat !== "" && `Kategori ${r.cat}`].filter(Boolean).join(" · ");
     const formula = !rail && r.mult != null && r.qty != null ? `${qty} × ${r.mult} = ${nf(r.pts)} poäng` : qty;
     const note = [r.stop, ...(rail ? r.notes.filter((n) => !/kategori/i.test(n)) : r.notes)].filter(Boolean).join(". ");
     h.push(`<button class="row ${cls}" type="button" data-i="${i}" aria-label="Rätta rad ${i + 1}">
@@ -710,7 +731,7 @@ function paperText(calc, total, ok, rail) {
   const L = [];
   for (const r of calc) {
     const line = docLine(r);
-    if (line) L.push(line, `  ${qtyText(r)} (lägg till antal och typ av kollin)`);
+    if (line) L.push(line, `  ${r.pkg ? r.pkg + ", " : ""}${qtyText(r)}${r.pkg ? "" : " (lägg till antal och typ av kollin)"}`);
   }
   if (!rail && ok) {
     L.push("", "Transporten sker enligt undantaget i ADR 1.1.3.6.");
@@ -723,7 +744,7 @@ function paperText(calc, total, ok, rail) {
 function paperHtml(calc, total, ok, rail) {
   const entries = calc.map((r) => {
     const line = docLine(r);
-    return line ? `<div class="entry"><b>${esc(line)}</b><span>${esc(qtyText(r))}, plus antal och typ av kollin</span></div>` : "";
+    return line ? `<div class="entry"><b>${esc(line)}</b><span>${r.pkg ? esc(r.pkg) + ", " + esc(qtyText(r)) : esc(qtyText(r)) + ". Antal och typ av kollin saknas, tryck på raden ovan och fyll i"}</span></div>` : "";
   }).join("");
   let sums = "";
   if (!rail && ok) {
@@ -809,6 +830,7 @@ function openSheet(i) {
   editIdx = i;
   const r = i >= 0 ? state.rows[i] : { un: "", pg: "", qty: null, unit: "L" };
   $("sheetTitle").textContent = i >= 0 ? "Rätta rad" : "Lägg till rad";
+  $("fPkg").value = r.pkg || "";
   $("fUn").value = r.un; $("fQty").value = r.qty == null ? "" : String(r.qty).replace(".", ",");
   editPg = r.pg || ""; editUnit = r.unit || "L";
   editLabels = r.cls ? [r.cls, ...(r.subs || [])].join(" + ") : "";
@@ -835,7 +857,7 @@ $("sheet").addEventListener("submit", (e) => {
   const same = old && old.un === un;
   const lab = !$("fLabelsField").hidden && editLabels ? labelSet(editLabels) : null;
   const row = { idType: "UN", un, name, cls: lab ? lab[0] : same ? old.cls : "", subs: lab ? lab.slice(1) : same ? old.subs || [] : [],
-                tunnel: same ? old.tunnel || "" : "", desc: same ? old.desc || "" : "", pg: editPg, qty, unit: editUnit, gross: false, warn: [] };
+                tunnel: same ? old.tunnel || "" : "", desc: same ? old.desc || "" : "", pkg: $("fPkg").value.trim(), pg: editPg, qty, unit: editUnit, gross: false, warn: [] };
   if (old) state.rows[editIdx] = row; else state.rows.push(row);
   if (state.example) { state.example = false; state.source = "Egen inmatning"; if (!old) state.rows = [row]; }
   closeSheet(); render();
